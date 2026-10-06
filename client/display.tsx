@@ -46,6 +46,10 @@ function DisplaySettings({ theme }: PluginSurfaceProps) {
 /** Settings notifications reach mounted screens; poll for changes made on other clients. */
 export function contributeDisplay(client: PluginClientContext, item: PluginSidebarContribution) {
   const sidebar = sidebarVisibility(() => client.addSidebarItem(item));
+  // Paseo 0.10.1 memoizes sidebar route resolution when an installation mounts.
+  // Register synchronously, then reconcile the saved preference, so that an
+  // already-open sidebar route can resolve its surface during that first render.
+  sidebar.set(true);
   const removeSettings = client.addSettingsScreen({ id: "display", title: "Display", icon: "PanelLeft", Component: DisplaySettings });
   const removeCommand = client.addCommandCenterItem({
     id: "display-settings",
