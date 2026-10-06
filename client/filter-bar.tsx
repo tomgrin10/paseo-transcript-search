@@ -224,12 +224,12 @@ export function FilterBar({
           {searchError}
         </Text>
       ) : searchNote ? (
-        <Text style={styles.note} numberOfLines={1}>
+        <Text style={styles.note} testID="transcript-search-coverage">
           {searchNote}
         </Text>
       ) : null}
       {indexNote ? (
-        <Text style={styles.note} numberOfLines={1}>
+        <Text style={styles.note} testID="transcript-search-index-status">
           {indexNote}
         </Text>
       ) : null}

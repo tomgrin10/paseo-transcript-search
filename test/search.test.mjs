@@ -115,3 +115,46 @@ test("hiding is reversible, registrations do not duplicate, and late reads canno
   assert.equal(registered, 2);
   assert.equal(removed, 2);
 });
+
+test("sidebar routes exist at installation mount and an old read cannot undo a saved toggle", async () => {
+  const externals = ["@getpaseo/plugin", "@getpaseo/plugin/client", "@getpaseo/plugin/client/ui", "@getpaseo/plugin/client/react-native", "@tanstack/react-query", "react", "react/jsx-runtime", "react-native", "zod"];
+  const built = await build({ entryPoints: ["index.client.tsx"], bundle: true, write: false, platform: "node", format: "cjs", external: externals });
+  let resolveRead;
+  const pending = new Promise((resolve) => { resolveRead = resolve; });
+  const modules = {
+    "@getpaseo/plugin": require("@getpaseo/plugin"),
+    zod: require("zod"),
+    react: { memo: (component) => component, useEffect(effect) { effect(); } },
+    "react/jsx-runtime": { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
+    "react-native": { StyleSheet: { create: (styles) => styles } },
+    "@tanstack/react-query": {},
+    "@getpaseo/plugin/client": { useSettings: () => ({ status: "ready", values: { showSidebar: false }, revision: "new", saving: false }) },
+    "@getpaseo/plugin/client/ui": {},
+    "@getpaseo/plugin/client/react-native": {},
+  };
+  const module = { exports: {} };
+  new Function("require", "module", "exports", built.outputFiles[0].text)((id) => {
+    if (!(id in modules)) throw new Error(`Unexpected client dependency: ${id}`);
+    return modules[id];
+  }, module, module.exports);
+  let added = 0, removed = 0, screen;
+  const commands = [];
+  const cleanup = module.exports.default({
+    addSurface() { return () => {}; },
+    addSidebarItem() { added += 1; return () => { removed += 1; }; },
+    addSettingsScreen(value) { screen = value; return () => {}; },
+    addCommandCenterItem(value) { commands.push(value); return () => {}; },
+    rpc() { return pending; },
+  });
+  try {
+    assert.equal(added, 1, "the host must see the sidebar route before its first render");
+    screen.Component({ theme: { colors: {} } });
+    assert.equal(removed, 1, "a saved hidden preference removes the sidebar immediately");
+    resolveRead({ status: "ready", revision: "old", values: { showSidebar: true } });
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(added, 1, "an older in-flight read must not re-register the hidden sidebar");
+    let opened;
+    commands.find((command) => command.id === "search-transcripts").onSelect({ openSurface(id) { opened = id; } });
+    assert.equal(opened, "transcript-search", "the direct surface command remains usable while hidden");
+  } finally { cleanup(); }
+});
