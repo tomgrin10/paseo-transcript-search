@@ -1,0 +1,6 @@
+{
+  "id": "transcript-search",
+  "requirements": {
+    "paseo": ">=0.10.1"
+  }
+}
