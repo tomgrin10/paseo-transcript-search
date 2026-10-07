@@ -21,3 +21,13 @@ Adapted from [panrafal's agents-history](https://github.com/panrafal/paseo-plugi
 Command Center actions are scoped by Paseo to the current host. Open a workspace or plugin on that host first; the hostless start page does not list plugin actions.
 
 The repository is private. With GitHub authentication configured on the daemon host, you can install it with `paseo plugin install https://github.com/tomgrin10/paseo-transcript-search --id transcript-search`.
+
+## More Paseo plugins
+
+Also available from [Tom Gringauz](https://github.com/tomgrin10):
+
+- [Defer](https://github.com/tomgrin10/paseo-defer) — Schedule messages to agents for later delivery.
+- [Graphite](https://github.com/tomgrin10/paseo-graphite) — Monitor Graphite stacks and PR action state.
+- [Smart Session](https://github.com/tomgrin10/paseo-smart-session) — Context-aware compaction and usage insights for long-running agents.
+- [Vitals](https://github.com/tomgrin10/paseo-vitals) — Host, Paseo, agent, and Docker health in one dashboard.
+- [Send to Paseo](https://github.com/tomgrin10/send-to-paseo) — Send GitHub and Graphite PRs to Paseo from Chrome.
