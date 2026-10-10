@@ -1,37 +1,72 @@
-# Transcript Search for Paseo
+# paseo-transcript-search
 
-Search text across active and archived sessions on **all connected Paseo hosts**, including Claude subagents and archived Codex transcripts. Requires Paseo **0.11.0 or newer**.
+[![Paseo](https://img.shields.io/badge/Paseo-%E2%89%A5%200.11.0-8A63D2?style=for-the-badge)](https://paseo.sh)
+[![Verify](https://img.shields.io/github/actions/workflow/status/tomgrin10/paseo-transcript-search/verify.yml?branch=main&style=for-the-badge&label=tests&color=2563eb)](https://github.com/tomgrin10/paseo-transcript-search/actions/workflows/verify.yml)
+[![License](https://img.shields.io/github/license/tomgrin10/paseo-transcript-search?style=for-the-badge&color=2563eb)](LICENSE)
 
-Open **⌘K** on macOS or **Ctrl+K** on Windows/Linux, type **Search all session transcripts**, and press Enter. The search field receives focus. Searches are literal and case-insensitive by default; optional regex, case sensitivity, relevance ranking, and project/provider/date filters are available. Results include matching snippets and links to sessions. Archived sessions ask for confirmation before restoring them.
+Find something said in a previous Paseo session, across all your connected hosts.
 
-In **Settings → Plugins → Transcript Search → Display**, disable **Show in sidebar** to keep keyboard access while hiding the sidebar entry. The setting is saved on the host and survives updates and reloads; other connected clients apply it within five seconds.
+![Transcript Search showing matching conversations from two connected hosts](docs/screenshots/transcript-search.png)
 
-Install this plugin on each host you want to search, using the same installation ID (`transcript-search`) and a current version. Update existing older copies under that same ID. Each copy identifies its daemon and shares its existing authenticated RPC capability with the other copies in the client. The surface automatically searches all online hosts in parallel; no passwords, SSH routes, or extra connections are configured in the plugin. Refreshing retries failed hosts and searches. Disconnected hosts and hosts missing an updated copy are named in the screen, and healthy hosts continue returning results.
+Example with synthetic sessions on a laptop and build server.
 
-Results show their originating host. Session, workspace, and project IDs are qualified by host, so copied IDs never merge accidentally. Opening or restoring a session targets its original host; archived sessions still require confirmation. Paseo 0.11.0 is required for native navigation to a specified host. Each host builds and uses its own optional index. If some hosts fall back to grep, results retain chronological grouping instead of comparing incompatible relevance scores.
+## Install
 
-Paseo session records determine which transcripts belong to sessions. Claude and Codex transcripts are resolved from their configured data directories; other providers are searchable when their native handle points to a local transcript file. Providers without retained transcripts appear as unavailable. Missing files do not prevent other sessions from being searched. The UI searches all selected sessions in batches without the original 2,000-session cutoff. Large searches retain explicit timeout and output-limit notices.
-
-Literal and regex searches use the host's `grep`; optional ranked search builds a local SQLite FTS5 cache on demand and falls back to literal search when SQLite is unavailable. Searches and transcript data remain on your Paseo host and its connected clients.
+Requires [Paseo](https://paseo.sh) **0.11.0 or newer** on the daemon and connected app. Enable plugins in **Settings → Plugins**, then run on each host you want to search:
 
 ```sh
-paseo plugin install /path/to/paseo-transcript-search --id transcript-search
-npm ci
-npm run verify
+paseo plugin install https://github.com/tomgrin10/paseo-transcript-search --id transcript-search
 ```
 
-Adapted from [panrafal's agents-history](https://github.com/panrafal/paseo-plugins/tree/004c6a80c6aa8e76bb563694c3eee5c2c0b0466f/agents-history), pinned at `004c6a80c6aa8e76bb563694c3eee5c2c0b0466f`, under the included MIT license. The fork uses the current SDK, native persistent display settings, a keyboard-first search entry, and bounded searches across the full session set. It installs no runtime dependencies.
+Update with `paseo plugin update transcript-search`. Keep the same installation ID on every host.
 
-Command Center actions are scoped by Paseo to the current host. Open a workspace or plugin on that host first; the hostless start page does not list plugin actions.
+## Use
 
-The repository is private. With GitHub authentication configured on the daemon host, you can install it with `paseo plugin install https://github.com/tomgrin10/paseo-transcript-search --id transcript-search`.
+- Open **Transcript Search** from the sidebar, or press **⌘K / Ctrl+K**, choose **Search all session transcripts**, and start typing.
+- Search active and archived sessions, including Claude subagents and archived Codex conversations.
+- Narrow results by project, provider, labels, date, or archive status. Literal, case-insensitive search is the default; regex, case sensitivity, and relevance ranking are optional.
+- Open a matching session on its original host. Archived sessions ask for confirmation before restoration.
+
+Open a workspace or plugin on a host first to make its Command Center actions available.
+
+### Multiple hosts
+
+Configure your hosts in Paseo and install this plugin on each. One search queries all online hosts in parallel and labels results with their source. No extra plugin connection setup is needed.
+
+Disconnected hosts, missing plugin installations, and failed searches are named in the screen. Results from healthy hosts stay available; **Refresh** retries failed requests. Copied session and project IDs remain separate between hosts.
+
+### Sidebar visibility
+
+In **Settings → Plugins → Transcript Search → Display**, turn **Show in sidebar** off to hide its menu entry. Keyboard access stays available. The host saves this preference across reloads and updates; other connected clients apply changes within five seconds.
+
+## Data and access
+
+Paseo plugins run trusted, unsandboxed code on the daemon host. This plugin reads session records under `$PASEO_HOME` (`~/.paseo` by default) and provider transcripts from their configured directories. It uses the authenticated Paseo connections already open in your app.
+
+Transcripts stay on their originating hosts; search returns matching snippets to connected clients. Provider persistence credentials are excluded from history responses. Missing transcript files do not stop other sessions from being searched, and searches cover all selected sessions in bounded batches. Timeout and output-limit notices identify incomplete results.
+
+Literal and regex searches use the host's `grep`. Windows hosts need a compatible `grep`, such as the copy included with Git for Windows. Optional ranked search uses built-in SQLite FTS5 and falls back to grep when the index is unavailable. Each host owns its index; when hosts use different search engines, results retain chronological grouping.
+
+## Development
+
+```sh
+git clone https://github.com/tomgrin10/paseo-transcript-search.git
+cd paseo-transcript-search
+npm ci
+npm run verify
+paseo plugin install "$PWD" --id transcript-search
+```
+
+After changes, run `npm run verify` and `paseo plugin reload transcript-search`. Reloading the plugin is enough; keep the daemon running.
 
 ## More Paseo plugins
 
-Also available from [Tom Gringauz](https://github.com/tomgrin10):
+- [Defer](https://github.com/tomgrin10/paseo-defer) — Schedule messages for later delivery.
+- [Graphite](https://github.com/tomgrin10/paseo-graphite) — Graphite stacks and PR status.
+- [Smart Session](https://github.com/tomgrin10/paseo-smart-session) — Context compaction and usage insights.
+- [Vitals](https://github.com/tomgrin10/paseo-vitals) — Host, agent, and Docker health.
+- [Send to Paseo](https://github.com/tomgrin10/send-to-paseo) — Send PRs to Paseo from Chrome.
 
-- [Defer](https://github.com/tomgrin10/paseo-defer) — Schedule messages to agents for later delivery.
-- [Graphite](https://github.com/tomgrin10/paseo-graphite) — Monitor Graphite stacks and PR action state.
-- [Smart Session](https://github.com/tomgrin10/paseo-smart-session) — Context-aware compaction and usage insights for long-running agents.
-- [Vitals](https://github.com/tomgrin10/paseo-vitals) — Host, Paseo, agent, and Docker health in one dashboard.
-- [Send to Paseo](https://github.com/tomgrin10/send-to-paseo) — Send GitHub and Graphite PRs to Paseo from Chrome.
+## License
+
+[MIT](LICENSE). Adapted from [panrafal's agents-history](https://github.com/panrafal/paseo-plugins/tree/004c6a80c6aa8e76bb563694c3eee5c2c0b0466f/agents-history), pinned at `004c6a80c6aa8e76bb563694c3eee5c2c0b0466f`. The original attribution is preserved in the license.
