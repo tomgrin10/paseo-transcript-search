@@ -2,12 +2,13 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type { PaseoApi } from "@getpaseo/client";
+import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import { z } from "zod";
 import { paseoHome } from "./paseo-home";
 
 const runFile = promisify(execFile);
 const pending = new Map<string, Promise<void>>();
+type PaseoApi = PluginHandlerContext["paseo"];
 
 export function restoreArchivedAgent(agentId: string, paseo: PaseoApi): Promise<void> {
   const existing = pending.get(agentId);
