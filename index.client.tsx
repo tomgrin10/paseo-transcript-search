@@ -1,6 +1,7 @@
 import { contributeDisplay } from "./client/display";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { HistorySurface } from "./client/history-surface";
+import { registerHost } from "./client/federation";
 
 /**
  * Contribution ids must match `^[a-z][a-z0-9-]*$`. A surface opened from the Command Center is
@@ -9,6 +10,7 @@ import { HistorySurface } from "./client/history-surface";
 const SURFACE_ID = "transcript-search";
 
 export default function contribute(client: PluginClientContext) {
+  const releaseHost = registerHost(client);
   client.addSurface(SURFACE_ID, HistorySurface);
   client.addCommandCenterItem({
     id: "search-transcripts",
@@ -18,5 +20,6 @@ export default function contribute(client: PluginClientContext) {
     context: "global",
     onSelect({ openSurface }) { openSurface(SURFACE_ID); },
   });
-  return contributeDisplay(client, { id: "history", title: "Transcript Search", icon: "Search", surface: SURFACE_ID });
+  const releaseDisplay = contributeDisplay(client, { id: "history", title: "Transcript Search", icon: "Search", surface: SURFACE_ID });
+  return () => { releaseDisplay(); releaseHost(); };
 }

@@ -110,6 +110,8 @@ export const METADATA_FIELD_LABELS: Record<string, string> = {
 export const ORPHAN_WORKSPACE_PREFIX = "orphan:";
 
 export interface HistoryWorkspace {
+  /** Client-only origin, preserved through filtering and ranking. */
+  host?: { id: string; label: string };
   id: string;
   workspace: WorkspaceSummary;
   project: ProjectSummary | null;

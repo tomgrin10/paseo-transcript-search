@@ -13,13 +13,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { AgentSummary } from "../shared/contracts";
+import { sourceKey } from "../shared/host-model";
 import { themeScheme } from "../shared/colors";
 import {
   EMPTY_FILTERS,
   type HistoryFilters,
   type HistoryWorkspace,
   buildQueryMatcher,
-  buildWorkspaces,
   countByLabel,
   countByProject,
   countByProvider,
@@ -65,13 +65,7 @@ const persisted: { filters: HistoryFilters; collapsed: Set<Group> } = {
   collapsed: new Set(),
 };
 
-function errorMessage(cause: unknown): string {
-  if (cause instanceof Error && cause.message) return cause.message;
-  const text = String(cause);
-  return text && text !== "undefined" ? text : "Could not load the history.";
-}
-
-export function HistorySurface({ theme, host, layout, navigation }: PluginSurfaceProps) {
+export function HistorySurface({ theme, layout, navigation }: PluginSurfaceProps) {
   const scheme = useMemo(() => themeScheme(theme), [theme]);
   const styles = useMemo(() => createStyles(theme, layout.compact), [theme, layout.compact]);
 
@@ -87,18 +81,15 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
     setCollapsedVersion((value) => value + 1);
   }, []);
 
-  const history = useHistory(host.id);
+  const history = useHistory();
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), CLOCK_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
-  useEffect(() => {
-    if (history.data) setNowMs(Date.now());
-  }, [history.data]);
 
-  const rows = useMemo(() => (history.data ? buildWorkspaces(history.data) : []), [history.data]);
+  const rows = history.rows;
   const providerCounts = useMemo(() => countByProvider(rows), [rows]);
   const projectCounts = useMemo(() => countByProject(rows), [rows]);
   const labelOptions = useMemo<DropdownOption[]>(
@@ -117,25 +108,18 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
   );
   const projectOptions = useMemo<DropdownOption[]>(() => {
     const projects = history.data?.projects ?? [];
-    // Two records can share a display name (a checkout and a plain directory); the root path
-    // tells them apart.
-    const nameCounts = new Map<string, number>();
-    for (const project of projects) {
-      const label = projectLabel(project);
-      nameCounts.set(label, (nameCounts.get(label) ?? 0) + 1);
-    }
     return projects
       .map((project) => {
         const label = projectLabel(project);
         return {
           id: project.projectId,
-          label: (nameCounts.get(label) ?? 0) > 1 ? `${label} (${project.rootPath})` : label,
+          label: `${label} · ${history.hosts.find(host => host.serverId === sourceKey(project.projectId).hostId)?.label ?? "host"}`,
           icon: project.archivedAt ? "Archive" : "FolderGit2",
           count: projectCounts.get(project.projectId) ?? 0,
         };
       })
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [history.data?.projects, projectCounts]);
+  }, [history.data.projects, history.hosts, projectCounts]);
 
   // Agents the static filters keep and whose transcript exists: the grep's search space.
   const staticRows = useMemo(
@@ -153,7 +137,7 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
   }, [filters, staticRows]);
 
   const mode = searchMode(filters);
-  const search = useHistorySearch(host.id, {
+  const search = useHistorySearch(history.successfulHosts, {
     query: filters.query,
     mode,
     regex: filters.regex,
@@ -162,20 +146,21 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
   });
 
   const searchActive = isSearchable(filters.query);
-  const index = useIndexStatus(host.id, mode === "ranked");
+  const indexNote = useIndexStatus(history.successfulHosts, mode === "ranked");
   // Ranked results in hand: order by score and drop the grouping so the best hit is on top.
-  const rankedActive = searchActive && search.matches !== null && search.result?.mode === "ranked";
+  const rankedActive = searchActive && !search.waiting && search.matches !== null && search.result?.mode === "ranked";
   const visible = useMemo(() => {
-    const filtered = filterWorkspaces(rows, filters, { nowMs, matches: search.matches });
+    const filtered = filterWorkspaces(rows, filters, { nowMs, matches: search.matches }).filter(row => !row.agents.every(agent => search.failedAgentIds.has(agent.id)));
     return rankedActive && search.matches ? rankWorkspaces(filtered, filters, search.matches) : filtered;
-  }, [filters, nowMs, rankedActive, rows, search.matches]);
+  }, [filters, nowMs, rankedActive, rows, search.matches, search.failedAgentIds]);
 
   const total = rows.length;
   const loading = history.isPending;
-  const failed = history.isError && !history.data;
+  const failed = history.successfulHosts.length === 0 && !loading;
   const refresh = useCallback(() => {
     void history.refetch();
-  }, [history]);
+    void search.refetch();
+  }, [history, search]);
 
   const visibleAgentCount = useMemo(
     () => visible.reduce((sum, row) => sum + visibleAgents(row, filters).length, 0),
@@ -183,8 +168,8 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
   );
   const summary =
     visible.length === total
-      ? `${pluralize(total, "workspace")} · ${pluralize(visibleAgentCount, "agent")}`
-      : `${visible.length} of ${pluralize(total, "workspace")} · ${pluralize(visibleAgentCount, "agent")}`;
+      ? `${pluralize(total, "workspace")} · ${pluralize(visibleAgentCount, "agent")} · ${pluralize(history.successfulHosts.length, "host")}`
+      : `${visible.length} of ${pluralize(total, "workspace")} · ${pluralize(visibleAgentCount, "agent")} · ${pluralize(history.successfulHosts.length, "host")}`;
 
   const searchNote = useMemo(() => {
     if (!searchActive) return null;
@@ -192,7 +177,7 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
     const result = search.result;
     if (!result) return null;
     const parts = [
-      `${pluralize(result.matches.length, "conversation")} matched across ${pluralize(result.searchedAgents, "agent")}`,
+      `${pluralize(result.matches.length, "conversation")} matched across ${pluralize(result.searchedAgents, "agent")} · ${search.completedHosts} of ${pluralize(search.targetHosts, "host")} searched`,
     ];
     if (result.unsearchableAgents.length > 0) {
       parts.push(
@@ -201,30 +186,10 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
           : `${result.unsearchableAgents.length} not searchable`,
       );
     }
-    if (result.relaxed) parts.push("no conversation has every word, showing any");
     if (result.outputTruncated) parts.push("results cut short");
-    if (result.fallback === "index-empty") parts.push("index being built, grep answered");
-    else if (result.fallback === "no-sqlite") parts.push("no search index on this host, grep answered");
-    if (search.capped) parts.push("only the first 2000 agents searched");
+    parts.push(...search.warnings);
     return parts.join(" · ");
-  }, [search.capped, search.result, searchActive, searchAgentIds.length]);
-
-  const indexNote = useMemo(() => {
-    if (mode !== "ranked") return null;
-    const status = index.data;
-    if (!status) return null;
-    if (!status.available) {
-      return status.reason === "no-sqlite" || status.reason === "fts5-missing"
-        ? `Ranked search needs a Node.js with SQLite FTS5 on ${host.label}; searches run through grep`
-        : `Search index unavailable on ${host.label}${status.lastError ? `: ${status.lastError}` : ""}`;
-    }
-    if (status.state === "planning" || status.state === "indexing" || status.state === "housekeeping") {
-      return `indexing conversations… ${status.indexedFiles} of ${pluralize(status.totalFiles, "file")}`;
-    }
-    if (status.lastError) return `index sync failed: ${status.lastError}`;
-    if (status.totalFiles === 0) return null;
-    return `${pluralize(status.indexedFiles, "conversation file")} indexed${status.stale ? ", refreshing" : ""}`;
-  }, [host.label, index.data, mode]);
+  }, [search.result, searchActive, searchAgentIds.length, search.completedHosts, search.targetHosts, search.warnings]);
 
   const matcher = useMemo(() => buildQueryMatcher(filters), [filters]);
   const grouped = useMemo(() => {
@@ -248,6 +213,7 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
         scheme={scheme}
         nowMs={nowMs}
         navigation={navigation}
+        host={row.host!}
       />
     );
   };
@@ -258,14 +224,15 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
         <Text style={styles.total} numberOfLines={1}>
           {summary}
         </Text>
-        {history.isError && history.data ? (
-          <Text style={styles.staleNote} numberOfLines={1}>
-            refresh failed
-          </Text>
-        ) : null}
         <View style={styles.headerSpacer} />
         <RefreshButton theme={theme} style={styles.refresh} busy={history.isFetching} onPress={refresh} />
       </View>
+
+      {history.warnings.length > 0 ? (
+        <Text style={styles.hostWarning} testID="transcript-search-host-warnings">
+          {history.warnings.join(" · ")}
+        </Text>
+      ) : null}
 
       <FilterBar
         filters={filters}
@@ -288,7 +255,7 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
         </View>
       ) : failed ? (
         <View style={styles.centered}>
-          <Text style={styles.error}>{errorMessage(history.error)}</Text>
+          <Text style={styles.error}>{history.hosts.length === 0 ? "Connect a Paseo host to search its transcripts." : "No host history is available yet. Install Transcript Search on connected hosts, then refresh."}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Retry loading the history"
@@ -300,7 +267,7 @@ export function HistorySurface({ theme, host, layout, navigation }: PluginSurfac
         </View>
       ) : total === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.empty}>{`No workspace has been recorded on ${host.label}`}</Text>
+          <Text style={styles.empty}>{"No workspace has been recorded on the connected hosts"}</Text>
         </View>
       ) : visible.length === 0 ? (
         <View style={styles.centered}>
@@ -445,7 +412,7 @@ function createStyles(theme: PluginTheme, compact: boolean) {
       paddingBottom: 6,
     },
     total: { color: theme.colors.foregroundMuted, fontSize: 13, flexShrink: 1 },
-    staleNote: { color: theme.colors.statusWarning, fontSize: 12 },
+    hostWarning: { color: theme.colors.statusWarning, fontSize: 12, paddingHorizontal: gutter, paddingBottom: 6 },
     headerSpacer: { flex: 1 },
     refresh: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
 

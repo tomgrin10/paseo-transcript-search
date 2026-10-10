@@ -1,10 +1,14 @@
 # Transcript Search for Paseo
 
-Search text across active and archived sessions, including Claude subagents and archived Codex transcripts. Requires Paseo **0.10.1 or newer**.
+Search text across active and archived sessions on **all connected Paseo hosts**, including Claude subagents and archived Codex transcripts. Requires Paseo **0.11.0 or newer**.
 
 Open **⌘K** on macOS or **Ctrl+K** on Windows/Linux, type **Search all session transcripts**, and press Enter. The search field receives focus. Searches are literal and case-insensitive by default; optional regex, case sensitivity, relevance ranking, and project/provider/date filters are available. Results include matching snippets and links to sessions. Archived sessions ask for confirmation before restoring them.
 
 In **Settings → Plugins → Transcript Search → Display**, disable **Show in sidebar** to keep keyboard access while hiding the sidebar entry. The setting is saved on the host and survives updates and reloads; other connected clients apply it within five seconds.
+
+Install this plugin on each host you want to search, using the same installation ID (`transcript-search`) and a current version. Update existing older copies under that same ID. Each copy identifies its daemon and shares its existing authenticated RPC capability with the other copies in the client. The surface automatically searches all online hosts in parallel; no passwords, SSH routes, or extra connections are configured in the plugin. Refreshing retries failed hosts and searches. Disconnected hosts and hosts missing an updated copy are named in the screen, and healthy hosts continue returning results.
+
+Results show their originating host. Session, workspace, and project IDs are qualified by host, so copied IDs never merge accidentally. Opening or restoring a session targets its original host; archived sessions still require confirmation. Paseo 0.11.0 is required for native navigation to a specified host. Each host builds and uses its own optional index. If some hosts fall back to grep, results retain chronological grouping instead of comparing incompatible relevance scores.
 
 Paseo session records determine which transcripts belong to sessions. Claude and Codex transcripts are resolved from their configured data directories; other providers are searchable when their native handle points to a local transcript file. Providers without retained transcripts appear as unavailable. Missing files do not prevent other sessions from being searched. The UI searches all selected sessions in batches without the original 2,000-session cutoff. Large searches retain explicit timeout and output-limit notices.
 

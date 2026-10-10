@@ -1,6 +1,13 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
+/** Binds each client installation to its stable daemon identity without sharing credentials. */
+export const hostIdentity = defineRpc({
+  name: "transcript-search.host-identity",
+  input: z.object({}),
+  output: z.object({ serverId: z.string().min(1), protocol: z.literal(1) }),
+});
+
 /**
  * Wire contracts between the surface and the plugin's daemon-side entry. The list call returns
  * the complete census the daemon keeps on disk (archived workspaces and agents included); the

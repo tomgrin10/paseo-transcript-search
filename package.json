@@ -1,24 +1,24 @@
 {
   "name": "paseo-transcript-search",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Search text across active and archived Paseo session transcripts.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "@getpaseo/client": "0.10.1",
-    "@getpaseo/protocol": "0.10.1",
+    "@getpaseo/client": "0.11.0",
+    "@getpaseo/plugin": "0.11.0",
+    "@getpaseo/protocol": "0.11.0",
     "@tanstack/react-query": "^5.90.11",
     "@types/node": "^24.0.0",
     "@types/react": "~19.2.0",
+    "esbuild": "^0.28.2",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "typescript": "^5.9.3",
-    "zod": "^4.4.3",
-    "@getpaseo/plugin": "0.10.1",
-    "esbuild": "^0.28.2"
+    "zod": "^4.4.3"
   },
   "license": "MIT",
   "author": "Tom Gringauz; based on agents-history by panrafal",

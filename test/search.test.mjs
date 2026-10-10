@@ -144,7 +144,7 @@ test("sidebar routes exist at installation mount and an old read cannot undo a s
     addSidebarItem() { added += 1; return () => { removed += 1; }; },
     addSettingsScreen(value) { screen = value; return () => {}; },
     addCommandCenterItem(value) { commands.push(value); return () => {}; },
-    rpc() { return pending; },
+    rpc(contract) { return contract.name === "transcript-search.host-identity" ? Promise.resolve({ serverId: "fixture-ui", protocol: 1 }) : pending; },
   });
   try {
     assert.equal(added, 1, "the host must see the sidebar route before its first render");

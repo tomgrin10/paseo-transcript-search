@@ -1,5 +1,5 @@
 import type { PluginTheme } from "@getpaseo/plugin";
-import { type PluginSurfaceProps, useRpc } from "@getpaseo/plugin/client";
+import { type PluginSurfaceProps } from "@getpaseo/plugin/client";
 import { Icon, Modal, useToast } from "@getpaseo/plugin/client/react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import type { AgentMatch, AgentSummary, Snippet } from "../shared/contracts";
 import { restoreAgent } from "../shared/contracts";
+import { sourceKey } from "../shared/host-model";
+import { rpcForHost } from "./federation";
 import { type ColorScheme, agentStatusColor } from "../shared/colors";
 import {
   AGENT_STATUS_LABELS,
@@ -50,6 +52,7 @@ export interface WorkspaceCardProps {
   scheme: ColorScheme;
   nowMs: number;
   navigation: CardNavigation;
+  host: { id: string; label: string };
 }
 
 /** Web bubbles presses to the card underneath; native ignores the call. */
@@ -70,6 +73,7 @@ function WorkspaceCardImpl({
   scheme,
   nowMs,
   navigation,
+  host,
 }: WorkspaceCardProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [hovered, setHovered] = useState(false);
@@ -77,12 +81,12 @@ function WorkspaceCardImpl({
   const timeAgo = formatTimeAgo(row.lastActivityMs, nowMs);
   const canOpen = Boolean(navigation) && !row.synthetic;
   const openWorkspace = useCallback(() => {
-    if (canOpen) navigation?.openWorkspace({ workspaceId: row.workspace.workspaceId });
-  }, [canOpen, navigation, row.workspace.workspaceId]);
+    if (canOpen) navigation?.openWorkspace({ workspaceId: sourceKey(row.workspace.workspaceId).id, serverId: host.id });
+  }, [canOpen, navigation, row.workspace.workspaceId, host.id]);
 
   // The title says what the workspace is for; project, branch, and worktree name say where.
   const title = row.workspace.title?.trim() || name;
-  const meta: { icon: string; text: string }[] = [];
+  const meta: { icon: string; text: string }[] = [{ icon: "Server", text: host.label }];
   if (row.project) meta.push({ icon: "FolderGit2", text: projectLabel(row.project) });
   if (row.workspace.branch) meta.push({ icon: "GitBranch", text: row.workspace.branch });
   if (!row.synthetic) meta.push({ icon: "FolderTree", text: name });
@@ -135,7 +139,7 @@ function WorkspaceCardImpl({
       {canOpen ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Open workspace ${title}${title !== name ? ` (${name})` : ""}${row.archived ? ", archived" : ""}, last active ${describeTimeAgo(timeAgo)}`}
+          accessibilityLabel={`Open workspace on ${host.label}: ${title}${title !== name ? ` (${name})` : ""}${row.archived ? ", archived" : ""}, last active ${describeTimeAgo(timeAgo)}`}
           onHoverIn={() => setHovered(true)}
           onHoverOut={() => setHovered(false)}
           onPress={openWorkspace}
@@ -159,6 +163,7 @@ function WorkspaceCardImpl({
               scheme={scheme}
               nowMs={nowMs}
               navigation={navigation}
+              host={host}
               styles={styles}
             />
           ))}
@@ -181,6 +186,7 @@ function AgentRow({
   scheme,
   nowMs,
   navigation,
+  host,
   styles,
 }: {
   agent: AgentSummary;
@@ -190,19 +196,20 @@ function AgentRow({
   scheme: ColorScheme;
   nowMs: number;
   navigation: CardNavigation;
+  host: { id: string; label: string };
   styles: CardStyles;
 }) {
   const [hovered, setHovered] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const restoring = useRef(false);
-  const restore = useRpc(restoreAgent);
+  const rawAgentId = sourceKey(agent.id).id;
   const toast = useToast();
   const queryClient = useQueryClient();
   const restoration = useMutation({
-    mutationFn: () => restore({ agentId: agent.id }),
+    mutationFn: () => rpcForHost(host.id)(restoreAgent, { agentId: rawAgentId }),
     onSuccess: () => {
       setConfirmOpen(false);
-      navigation?.openAgent({ agentId: agent.id });
+      navigation?.openAgent({ agentId: rawAgentId, serverId: host.id });
     },
     onError: (error: Error) => toast.error(`Could not restore agent: ${error.message}`),
     onSettled: () => {
@@ -217,9 +224,9 @@ function AgentRow({
     (event?: GestureResponderEvent) => {
       stopPropagation(event);
       if (agent.archivedAt) setConfirmOpen(true);
-      else navigation?.openAgent({ agentId: agent.id });
+      else navigation?.openAgent({ agentId: rawAgentId, serverId: host.id });
     },
-    [agent.id, agent.archivedAt, navigation],
+    [rawAgentId, agent.archivedAt, navigation, host.id],
   );
 
   const detail: { icon: string; text: string; color?: string }[] = [

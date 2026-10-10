@@ -1,14 +1,21 @@
 import { displayPreferences } from "./shared/display";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { paseoHome } from "./server/paseo-home";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { buildCensus, clearCensusCaches } from "./server/census";
 import { getIndexStatus, stopIndexer } from "./server/indexer";
 import { abortAllSearches, runSearch } from "./server/search";
 import { clearTranscriptCaches } from "./server/transcripts";
-import { indexStatus, listHistory, restoreAgent, searchHistory } from "./shared/contracts";
+import { hostIdentity, indexStatus, listHistory, restoreAgent, searchHistory } from "./shared/contracts";
 import { restoreArchivedAgent } from "./server/restore-agent";
 
 export default function contribute(server: PluginServerContext) {
   server.registerSettings(displayPreferences);
+  server.handle(hostIdentity, async () => ({
+    serverId: process.env.PASEO_SERVER_ID?.trim() || (await readFile(join(paseoHome(), "server-id"), "utf8")).trim(),
+    protocol: 1 as const,
+  }));
   server.handle(restoreAgent, async ({ agentId }, { paseo }) => {
     await restoreArchivedAgent(agentId, paseo);
     return { agentId };

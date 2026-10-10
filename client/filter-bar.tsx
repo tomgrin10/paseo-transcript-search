@@ -220,7 +220,7 @@ export function FilterBar({
       </View>
 
       {searchError ? (
-        <Text style={styles.error} numberOfLines={2}>
+        <Text style={styles.error}>
           {searchError}
         </Text>
       ) : searchNote ? (

@@ -1,26 +1,23 @@
-import { useRpc } from "@getpaseo/plugin/client";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { indexStatus } from "../shared/contracts";
+import { rpcForHost, type SearchHost } from "./federation";
 
-/**
- * Where the search index stands on the selected host. Polled quickly while it is being built so
- * the note under the filters counts up, slowly once it is idle, and not at all in regex mode.
- */
-
-const IDLE_INTERVAL_MS = 30_000;
-const BUSY_INTERVAL_MS = 2_000;
-
-export function useIndexStatus(hostId: string, enabled: boolean) {
-  const status = useRpc(indexStatus);
-  return useQuery({
-    queryKey: ["agents-history", "index-status", hostId] as const,
-    queryFn: () => status({}),
+export function useIndexStatus(hosts: readonly SearchHost[], enabled: boolean) {
+  const queries = useQueries({ queries: hosts.map(host => ({
+    queryKey: ["agents-history", "index-status", host.serverId, host.generation] as const,
+    queryFn: () => rpcForHost(host.serverId)(indexStatus, {}),
     enabled,
-    placeholderData: keepPreviousData,
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (!data || !data.available) return IDLE_INTERVAL_MS;
-      return data.state === "idle" && !data.stale ? IDLE_INTERVAL_MS : BUSY_INTERVAL_MS;
-    },
-  });
+    retry: 1,
+    refetchInterval: 5_000,
+  })) });
+  if (!enabled) return null;
+  return queries.flatMap((query, index) => {
+    const status = query.data;
+    if (!status) return [];
+    const host = hosts[index];
+    if (!status.available) return [`${host.label}: index unavailable; using grep`];
+    if (status.lastError) return [`${host.label}: index sync failed`];
+    if (status.state !== "idle" || status.stale) return [`${host.label}: indexing ${status.indexedFiles} of ${status.totalFiles} files`];
+    return [];
+  }).join(" · ") || null;
 }
