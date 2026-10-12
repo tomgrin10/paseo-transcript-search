@@ -1,6 +1,5 @@
 {
   "name": "paseo-transcript-search",
-  "private": true,
   "version": "0.2.0",
   "description": "Search text across active and archived Paseo session transcripts.",
   "scripts": {
@@ -31,7 +30,8 @@
     "server/",
     "shared/",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "docs/"
   ],
   "repository": {
     "type": "git",
@@ -40,5 +40,11 @@
   "homepage": "https://github.com/tomgrin10/paseo-transcript-search#readme",
   "bugs": {
     "url": "https://github.com/tomgrin10/paseo-transcript-search/issues"
-  }
+  },
+  "keywords": [
+    "paseo",
+    "paseo-plugin",
+    "transcripts",
+    "search"
+  ]
 }

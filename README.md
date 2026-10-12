@@ -1,7 +1,8 @@
 # paseo-transcript-search
 
+[![npm version](https://img.shields.io/npm/v/paseo-transcript-search?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/paseo-transcript-search)
+[![npm downloads](https://img.shields.io/npm/dm/paseo-transcript-search?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/paseo-transcript-search)
 [![Paseo](https://img.shields.io/badge/Paseo-%E2%89%A5%200.11.0-8A63D2?style=for-the-badge)](https://paseo.sh)
-[![Verify](https://img.shields.io/github/actions/workflow/status/tomgrin10/paseo-transcript-search/verify.yml?branch=main&style=for-the-badge&label=tests&color=2563eb)](https://github.com/tomgrin10/paseo-transcript-search/actions/workflows/verify.yml)
 [![License](https://img.shields.io/github/license/tomgrin10/paseo-transcript-search?style=for-the-badge&color=2563eb)](LICENSE)
 
 Find something said in a previous Paseo session, across all your connected hosts.
@@ -15,7 +16,7 @@ Example with synthetic sessions on a laptop and build server.
 Requires [Paseo](https://paseo.sh) **0.11.0 or newer** on the daemon and connected app. Enable plugins in **Settings → Plugins**, then run on each host you want to search:
 
 ```sh
-paseo plugin install https://github.com/tomgrin10/paseo-transcript-search --id transcript-search
+paseo plugin install paseo-transcript-search
 ```
 
 Update with `paseo plugin update transcript-search`. Keep the same installation ID on every host.
@@ -59,14 +60,17 @@ paseo plugin install "$PWD" --id transcript-search
 
 After changes, run `npm run verify` and `paseo plugin reload transcript-search`. Reloading the plugin is enough; keep the daemon running.
 
-## More Paseo plugins
+## License
+
+[MIT](LICENSE). Adapted from [panrafal's agents-history](https://github.com/panrafal/paseo-plugins/tree/004c6a80c6aa8e76bb563694c3eee5c2c0b0466f/agents-history), pinned at `004c6a80c6aa8e76bb563694c3eee5c2c0b0466f`. The original attribution is preserved in the license.
+
+## Other plugins
 
 - [Defer](https://github.com/tomgrin10/paseo-defer) — Schedule messages for later delivery.
 - [Graphite](https://github.com/tomgrin10/paseo-graphite) — Graphite stacks and PR status.
 - [Smart Session](https://github.com/tomgrin10/paseo-smart-session) — Context compaction and usage insights.
 - [Vitals](https://github.com/tomgrin10/paseo-vitals) — Host, agent, and Docker health.
-- [Send to Paseo](https://github.com/tomgrin10/send-to-paseo) — Send PRs to Paseo from Chrome.
-
-## License
-
-[MIT](LICENSE). Adapted from [panrafal's agents-history](https://github.com/panrafal/paseo-plugins/tree/004c6a80c6aa8e76bb563694c3eee5c2c0b0466f/agents-history), pinned at `004c6a80c6aa8e76bb563694c3eee5c2c0b0466f`. The original attribution is preserved in the license.
+- [Session Guard](https://github.com/tomgrin10/paseo-session-guard) — Pause at session limits and continue after reset.
+- [Transfer](https://github.com/tomgrin10/paseo-transfer) — Copy or move workspaces between hosts.
+- [Send to Paseo](https://github.com/tomgrin10/send-to-paseo) — Send GitHub and Graphite PRs to Paseo from Chrome.
+- [Dispatch](https://github.com/tomgrin10/paseo-dispatch) — Route tasks to existing workspaces (development preview).
