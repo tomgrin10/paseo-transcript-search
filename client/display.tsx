@@ -2,8 +2,9 @@ import type { PluginClientContext, PluginSidebarContribution, PluginSurfaceProps
 import { useSettings } from "@getpaseo/plugin/client";
 import { SettingsAction, SettingsCard, SettingsSection, SettingsSwitch } from "@getpaseo/plugin/client/ui";
 import { useEffect } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { displayPreferences, displayRpc } from "../shared/display";
+import { withNavigation } from "./navigation";
 import { sidebarVisibility } from "./sidebar-visibility";
 
 const listeners = new Set<(visible: boolean) => void>();
@@ -28,6 +29,7 @@ function DisplaySettings({ theme }: PluginSurfaceProps) {
   );
 
   return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
     <SettingsSection title="Navigation">
       <SettingsCard>
         <SettingsSwitch
@@ -40,6 +42,7 @@ function DisplaySettings({ theme }: PluginSurfaceProps) {
       </SettingsCard>
       {settings.saveError && <Text accessibilityRole="alert" style={{ color: theme.colors.statusDanger }}>{settings.saveError}</Text>}
     </SettingsSection>
+    </ScrollView>
   );
 }
 
@@ -50,14 +53,16 @@ export function contributeDisplay(client: PluginClientContext, item: PluginSideb
   // Register synchronously, then reconcile the saved preference, so that an
   // already-open sidebar route can resolve its surface during that first render.
   sidebar.set(true);
-  const removeSettings = client.addSettingsScreen({ id: "display", title: "Display", icon: "PanelLeft", Component: DisplaySettings });
+  const Settings = withNavigation(DisplaySettings, client, item.surface, "display");
+  const removeSurface = client.addSurface("display-settings", Settings);
+  const removeSettings = client.addSettingsScreen({ id: "display", title: "Display", icon: "PanelLeft", Component: Settings });
   const removeCommand = client.addCommandCenterItem({
     id: "display-settings",
-    title: `${item.title}: sidebar settings`,
+    title: `${item.title}: display settings`,
     icon: "PanelLeft",
     keywords: [item.title, "sidebar", "show", "hide", "display", "settings"],
     context: "global",
-    onSelect({ openSettings }) { openSettings("display"); },
+    onSelect({ openSurface }) { openSurface("display-settings"); },
   });
   let disposed = false;
   let pending = false;
@@ -85,6 +90,7 @@ export function contributeDisplay(client: PluginClientContext, item: PluginSideb
     clearInterval(timer);
     listeners.delete(update);
     sidebar.dispose();
+    removeSurface();
     removeSettings();
     removeCommand();
   };
