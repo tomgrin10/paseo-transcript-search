@@ -1,3 +1,4 @@
+import { withNavigation } from "./client/navigation";
 import { contributeDisplay } from "./client/display";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { HistorySurface } from "./client/history-surface";
@@ -11,7 +12,7 @@ const SURFACE_ID = "transcript-search";
 
 export default function contribute(client: PluginClientContext) {
   const releaseHost = registerHost(client);
-  client.addSurface(SURFACE_ID, HistorySurface);
+  client.addSurface(SURFACE_ID, withNavigation(HistorySurface, client, "transcript-search"));
   client.addCommandCenterItem({
     id: "search-transcripts",
     title: "Search all session transcripts",

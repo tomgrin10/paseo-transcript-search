@@ -148,7 +148,9 @@ test("sidebar routes exist at installation mount and an old read cannot undo a s
   });
   try {
     assert.equal(added, 1, "the host must see the sidebar route before its first render");
-    screen.Component({ theme: { colors: {} } });
+    const view = screen.Component({ theme: { colors: {} } });
+    const settings = view.props.children[1];
+    settings.type(settings.props);
     assert.equal(removed, 1, "a saved hidden preference removes the sidebar immediately");
     resolveRead({ status: "ready", revision: "old", values: { showSidebar: true } });
     await Promise.resolve(); await Promise.resolve();
