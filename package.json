@@ -24,6 +24,7 @@
   "type": "module",
   "files": [
     "paseo-plugin.json",
+    "assets/",
     "index.client.tsx",
     "index.server.ts",
     "client/",
