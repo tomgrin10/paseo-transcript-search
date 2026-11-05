@@ -1,23 +1,20 @@
 import { contributeAgentTools } from "./server/native-tools";
 import { displayPreferences } from "./shared/display";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { paseoHome } from "./server/paseo-home";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { buildCensus, clearCensusCaches } from "./server/census";
 import { getIndexStatus, stopIndexer } from "./server/indexer";
 import { abortAllSearches, runSearch } from "./server/search";
 import { clearTranscriptCaches } from "./server/transcripts";
-import { hostIdentity, indexStatus, listHistory, restoreAgent, searchHistory } from "./shared/contracts";
+import { attachSearch, hostIdentity, indexStatus, listHistory, readExcerpt, restoreAgent, searchHistory } from "./shared/contracts";
+import { searchAttachments } from "./server/attach";
+import { excerptForAgent } from "./server/excerpt";
+import { serverId } from "./server/sessions";
 import { restoreArchivedAgent } from "./server/restore-agent";
 
 export default function contribute(server: PluginServerContext) {
   const removeTools = contributeAgentTools(server);
   server.registerSettings(displayPreferences);
-  server.handle(hostIdentity, async () => ({
-    serverId: process.env.PASEO_SERVER_ID?.trim() || (await readFile(join(paseoHome(), "server-id"), "utf8")).trim(),
-    protocol: 1 as const,
-  }));
+  server.handle(hostIdentity, async () => ({ serverId: await serverId(), protocol: 1 as const }));
   server.handle(restoreAgent, async ({ agentId }, { paseo }) => {
     await restoreArchivedAgent(agentId, paseo);
     return { agentId };
@@ -29,6 +26,8 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(searchHistory, (input) => runSearch(input));
   server.handle(indexStatus, () => getIndexStatus());
+  server.handle(readExcerpt, ({ agentId, fileName, ...options }) => excerptForAgent(agentId, fileName, options));
+  server.handle(attachSearch, ({ query }) => searchAttachments(query));
   return async () => {
     removeTools();
     abortAllSearches();

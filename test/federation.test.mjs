@@ -73,33 +73,40 @@ test('independently evaluated host bundles share the same credential-free regist
 
 test('opening and restoring a copied session explicitly targets its source host',async()=>{
   const {scopeHistory}=await load('shared/host-model.ts');
+  const {buildResults}=await load('shared/results.ts');
+  const {EMPTY_FILTERS}=await load('shared/model.ts');
   const {federation}=await load('client/federation.ts');
-  const calls=[], navigations=[], mutations=[];
+  const calls=[], navigations=[], mutations=[], pending=[];
   const release=federation.register('remote-origin',async(contract,input)=>{calls.push({method:contract.name,input});return {agentId:input.agentId};});
-  const externals=['@getpaseo/plugin','@getpaseo/plugin/client','@getpaseo/plugin/client/react-native','@tanstack/react-query','react','react/jsx-runtime','react-native','zod'];
-  const built=await build({entryPoints:['client/workspace-card.tsx'],bundle:true,write:false,platform:'node',format:'cjs',external:externals});
+  const externals=['@getpaseo/plugin','@getpaseo/plugin/client','@getpaseo/plugin/client/ui','@tanstack/react-query','react','react/jsx-runtime','react-native','zod'];
+  const built=await build({entryPoints:['client/open-session.tsx'],bundle:true,write:false,platform:'node',format:'cjs',external:externals});
   const element=(type,props)=>({type,props});
   const modules={
     '@getpaseo/plugin':require('@getpaseo/plugin'),zod:require('zod'),
     '@getpaseo/plugin/client':{},
-    '@getpaseo/plugin/client/react-native':{Icon:'Icon',Modal:'Modal',useToast:()=>({error(){}})},
+    '@getpaseo/plugin/client/ui':{Icon:'Icon',Modal:Object.assign(()=>null,{Content:'Content'}),useToast:()=>({error(){},show(){}})},
     '@tanstack/react-query':{useMutation(options){mutations.push(options);return {isPending:false,mutate(){}};},useQueryClient:()=>({invalidateQueries:async()=>{}})},
-    react:{memo:x=>x,useCallback:x=>x,useMemo:x=>x(),useRef:x=>({current:x}),useState:x=>[typeof x==='function'?x():x,()=>{}]},
-    'react/jsx-runtime':{jsx:element,jsxs:element},
-    'react-native':{StyleSheet:{create:x=>x,hairlineWidth:1},View:'View',Text:'Text',Pressable:'Pressable',ActivityIndicator:'ActivityIndicator'},
+    react:{useCallback:x=>x,useMemo:x=>x(),useRef:x=>({current:x}),useState:x=>[typeof x==='function'?x():x,value=>pending.push(value)],useEffect(){},useLayoutEffect(){}},
+    'react/jsx-runtime':{jsx:element,jsxs:element,Fragment:'Fragment'},
+    'react-native':{View:'View',Text:'Text',Pressable:'Pressable',ActivityIndicator:'ActivityIndicator',Platform:{OS:'web'},Animated:{Value:class{},View:'AnimatedView'},AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:()=>({remove(){}})}},
   };
   const module={exports:{}};
   new Function('require','module','exports',built.outputFiles[0].text)(id=>modules[id],module,module.exports);
-  const row=scopeHistory({serverId:'remote-origin',label:'Remote'},census).rows.find(row=>!row.synthetic);
-  const tree=module.exports.WorkspaceCard({row,agents:row.agents,matches:null,searchActive:false,theme:{colors:{}},scheme:'light',nowMs:Date.now(),host:row.host,navigation:{openWorkspace:input=>navigations.push(input),openAgent:input=>navigations.push(input)}});
-  const nodes=[];
-  function visit(node){if(!node)return;if(Array.isArray(node)){node.forEach(visit);return;}if(typeof node.type==='function'){visit(node.type(node.props));return;}nodes.push(node);visit(node.props?.children);}
+  const archivedCensus={...census,agents:census.agents.map(agent=>agent.id==='agent'?{...agent,archivedAt:'2026-10-02T00:00:00Z'}:agent)};
+  const rows=scopeHistory({serverId:'remote-origin',label:'Remote'},archivedCensus).rows;
+  const [result]=buildResults(rows,EMPTY_FILTERS,{nowMs:Date.parse('2026-10-03T00:00:00Z'),matches:null,ranked:false}).filter(result=>!result.row.synthetic);
+  const navigation={openWorkspace:input=>navigations.push(input),openAgent:input=>navigations.push(input)};
+  const opener=module.exports.useOpenSession(navigation,{colors:{}},false);
   try {
-    visit(tree);
-    nodes.find(node=>node.type==='Pressable' && node.props.accessibilityLabel?.startsWith('Open workspace on Remote:')).props.onPress();
+    opener.openWorkspace(result);
     assert.deepEqual(navigations.pop(),{workspaceId:'workspace',serverId:'remote-origin'});
-    await mutations[0].mutationFn();mutations[0].onSuccess();
+    opener.open(result);
+    assert.equal(navigations.length,0,'an archived session asks before it is restored');
+    assert.equal(pending.pop(),result);
+    await mutations[0].mutationFn(result);mutations[0].onSuccess(undefined,result);
     assert.deepEqual(calls,[{method:'agents-history.restore-agent',input:{agentId:'agent'}}]);
     assert.deepEqual(navigations.pop(),{agentId:'agent',serverId:'remote-origin'});
+    opener.open({...result,agent:{...result.agent,archivedAt:null}});
+    assert.deepEqual(navigations.pop(),{agentId:'agent',serverId:'remote-origin'},'an active session opens directly on its host');
   } finally {release();}
 });

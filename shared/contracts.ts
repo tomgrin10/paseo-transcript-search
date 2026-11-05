@@ -1,4 +1,4 @@
-import { defineRpc } from "@getpaseo/plugin";
+import { PluginAttachmentSearchPayloadSchema, defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
 /** Binds each client installation to its stable daemon identity without sharing credentials. */
@@ -110,6 +110,8 @@ export const SnippetSchema = z.object({
   clipped: z.boolean().optional(),
   /** Relevance of this chunk in ranked mode; higher is better. */
   score: z.number().optional(),
+  /** Base name of the transcript file the line is in, so a subagent line can be read in context. */
+  fileName: z.string().optional(),
 });
 export type Snippet = z.infer<typeof SnippetSchema>;
 
@@ -212,4 +214,57 @@ export const restoreAgent = defineRpc({
   name: "agents-history.restore-agent",
   input: z.object({ agentId: z.string().uuid() }),
   output: z.object({ agentId: z.string() }),
+});
+
+export const ExcerptMessageSchema = z.object({
+  line: z.number().int().positive(),
+  role: SnippetRoleSchema,
+  text: z.string(),
+  timestamp: z.string().optional(),
+  /** The text was shortened for display. */
+  clipped: z.boolean().optional(),
+  /** For a tool line: the tool's name when the transcript names it. */
+  tool: z.string().optional(),
+});
+export type ExcerptMessage = z.infer<typeof ExcerptMessageSchema>;
+
+export const EXCERPT_MAX_RADIUS = 8;
+
+/**
+ * The conversation around one transcript line, for the preview and the agent read tool. Without a
+ * line it is the session's opening request and its last turns. Text only; never a path.
+ */
+export const readExcerpt = defineRpc({
+  name: "transcript-search.excerpt",
+  input: z.object({
+    agentId: z.string().min(1),
+    /** Base name of the file to read; the main transcript when omitted. */
+    fileName: z.string().min(1).max(300).optional(),
+    lineNumber: z.number().int().positive().optional(),
+    /** Messages kept on each side of the line. */
+    radius: z.number().int().min(0).max(EXCERPT_MAX_RADIUS).default(3),
+    /** Centres a long matched message on the search text. */
+    query: z.string().max(500).optional(),
+    regex: z.boolean().default(false),
+    caseSensitive: z.boolean().default(false),
+  }),
+  output: z.object({
+    messages: z.array(ExcerptMessageSchema),
+    /** Index into messages of the requested line, or null when it holds nothing readable. */
+    target: z.number().int().nonnegative().nullable(),
+    file: z.enum(["main", "subagent"]),
+    /** Messages exist before the first one returned. */
+    more: z.boolean(),
+    /** The opening request when the excerpt does not include it. */
+    opening: ExcerptMessageSchema.nullable(),
+    error: z.string().optional(),
+  }),
+});
+export type Excerpt = z.infer<typeof readExcerpt.output>;
+
+/** Paseo's composer "+" menu calls this with what the person typed in its picker. */
+export const attachSearch = defineRpc({
+  name: "transcript-search.attach-search",
+  input: z.object({ query: z.string().max(500) }),
+  output: PluginAttachmentSearchPayloadSchema,
 });

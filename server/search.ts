@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
 import type { AgentMatch, SearchError, Snippet, SnippetRole, searchHistory } from "../shared/contracts";
@@ -417,7 +417,7 @@ async function execute(input: SearchInput, signal: AbortSignal): Promise<SearchO
     const dedupeKey = `${body.role}\u0000${body.before}${body.match}${body.after}`;
     if (collector.snippets.has(dedupeKey)) return;
     collector.snippets.set(dedupeKey, {
-      snippet: { file: target.file.kind, lineNumber, ...body },
+      snippet: { file: target.file.kind, lineNumber, ...body, fileName: basename(target.file.path) },
       source,
     });
   };
