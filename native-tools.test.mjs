@@ -42,8 +42,8 @@ test("search results name each session, and the read tool returns the turns arou
   assert.deepEqual(definitions.map((tool) => tool.name), ["transcript_search_conversations", "transcript_read_conversation"]);
   const found = await call(definitions[0], { query: "invoice" });
   assert.deepEqual([found.structuredContent.query, found.structuredContent.matches[0].title, found.structuredContent.matches[0].workspace, found.structuredContent.matches[0].provider], ["invoice", "Add backoff", "Invoice retry backoff · billing-service · feat/retries", "Claude"]);
-  const read = await call(definitions[1], { agentId: "a1", line: 4 });
-  assert.deepEqual(reads, [{ agentId: "a1", fileName: undefined, lineNumber: 4, radius: 3, signal: undefined }]);
+  const read = await call(definitions[1], { agentId: "a1", line: 4, query: "invoice" });
+  assert.deepEqual(reads, [{ agentId: "a1", fileName: undefined, lineNumber: 4, radius: 3, signal: undefined, query: "invoice" }]);
   assert.match(read.text, /^Session: Add backoff\nAgent ID: a1 \(Claude, claude-opus-5-5\) on Paseo host srv_fixture/);
   assert.match(read.text, /Agent \(line 4\) \[match\]:\nDerived from the invoice id\./);
   assert.equal(read.structuredContent.title, "Add backoff");

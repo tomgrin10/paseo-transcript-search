@@ -76,6 +76,8 @@ export interface FilterRowProps {
   labels: readonly DropdownOption[];
   theme: Theme;
   compact: boolean;
+  /** One sideways-scrolling row (phones and narrow windows) instead of wrapping. */
+  scroll?: boolean;
 }
 
 function toggled<Value>(set: ReadonlySet<Value>, value: Value): Set<Value> {
@@ -91,7 +93,7 @@ function summarize(selected: ReadonlySet<string>, names: ReadonlyMap<string, str
 }
 
 /** Narrowing filters on the left, sort on the right; one scrolling row on a phone. */
-export function FilterRow({ filters, onChange, hosts, hostIds, onHosts, providers, projects, labels, theme, compact }: FilterRowProps) {
+export function FilterRow({ filters, onChange, hosts, hostIds, onHosts, providers, projects, labels, theme, compact, scroll = compact }: FilterRowProps) {
   const names = useMemo(() => new Map([...hosts, ...providers, ...projects, ...labels].map((option) => [option.id, option.label])), [hosts, providers, projects, labels]);
   const ranked = filters.ranked && !filters.regex;
   const common = { theme, compact };
@@ -102,14 +104,16 @@ export function FilterRow({ filters, onChange, hosts, hostIds, onHosts, provider
     {labels.length > 0 ? <Dropdown {...common} label="Label" icon="Tag" summary={summarize(filters.labels, names)} options={labels} selected={filters.labels} multi onToggle={(id) => onChange({ ...filters, labels: toggled(filters.labels, id) })} onClear={() => onChange({ ...filters, labels: new Set() })} /> : null}
     <Dropdown {...common} label="Date" icon="CalendarClock" summary={filters.period === "all" ? null : PERIOD_MODE_LABELS[filters.period]} options={PERIOD_MODES.map((mode) => ({ id: mode, label: PERIOD_SHORT[mode] }))} selected={new Set([filters.period])} multi={false} onToggle={(id) => onChange({ ...filters, period: id as PeriodMode })} />
     <Dropdown {...common} label="Status" icon="Archive" summary={filters.archived === "all" ? null : STATUS_LABELS[filters.archived]} options={ARCHIVED_MODES.map((mode) => ({ id: mode, label: STATUS_LABELS[mode] }))} selected={new Set([filters.archived])} multi={false} onToggle={(id) => onChange({ ...filters, archived: id as ArchivedMode })} />
-    {compact ? null : <View style={{ flex: 1, minWidth: 8 }} />}
+    {scroll ? null : <View style={{ flex: 1, minWidth: 8 }} />}
     <Dropdown {...common} label="Sort" icon={ranked ? "Sparkles" : "ArrowDownWideNarrow"} alwaysShowValue highlighted={ranked} summary={ranked ? "Best match" : "Newest first"}
       options={[{ id: "newest", label: "Newest first" }, { id: "best", label: filters.regex ? "Best match (turns off regex)" : "Best match" }]}
       selected={new Set([ranked ? "best" : "newest"])} multi={false}
       onToggle={(id) => onChange(id === "best" ? { ...filters, ranked: true, regex: false } : { ...filters, ranked: false })} />
   </>;
-  if (compact) {
-    return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, alignItems: "center" }}>{items}</ScrollView>;
+  if (scroll) {
+    const gutter = compact ? 16 : 24;
+    // A trailing spacer, not paddingRight: web drops end padding in a horizontal scroll.
+    return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -gutter }} contentContainerStyle={{ gap: 8, paddingLeft: gutter, alignItems: "center" }}>{items}<View style={{ width: gutter - 8 }} /></ScrollView>;
   }
   return <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>{items}</View>;
 }

@@ -21,10 +21,13 @@ const MIN_QUERY = 2;
  * The matched words with a little on each side. Paseo's picker filters its rows again by what was
  * typed (label, then subtitle), so the subtitle has to carry the match itself or the row is hidden.
  */
-export function matchWindow(snippet: Snippet): string {
+export function matchWindow(snippet: Snippet, titleLength = 0): string {
   const flat = (text: string) => text.replace(/\s+/g, " ");
   const before = flat(snippet.before).trimStart(), after = flat(snippet.after).trimEnd();
-  const lead = before.length > 22 ? `…${before.slice(-22).replace(/^\S*\s/, "")}` : before;
+  // The picker shows the subtitle in what the title leaves of a fixed width: after a long title,
+  // start at the match itself; otherwise keep a word or two before it.
+  const room = titleLength > 28 ? 0 : 10;
+  const lead = before.length > room ? `…${room ? before.slice(-room).replace(/^\S*\s/, "") : ""}` : before;
   const tail = after.length > 48 ? `${after.slice(0, 48).replace(/\s\S*$/, "")}…` : after;
   return `${lead}${flat(snippet.match)}${tail}`.trim();
 }
@@ -65,10 +68,12 @@ export async function searchAttachments(rawQuery: string, signal?: AbortSignal):
     if (!session) continue;
     const { info } = session;
     const first = match?.snippets[0];
-    const subtitle = [first ? `“${matchWindow(first)}”` : null, info.workspaceTitle ?? info.projectName, info.providerLabel].filter(Boolean).join(" · ");
+    const when = shortDate(info.lastActivityAt, Date.now());
+    const subtitle = [first ? `“${matchWindow(first, info.title.length)}”` : null, info.workspaceTitle ?? info.projectName, info.providerLabel, when].filter(Boolean).join(" · ");
     items.push({
       id: agentId,
-      identifier: shortDate(info.lastActivityAt, Date.now()),
+      // The picker row reads `${identifier} ${title}`: a date there runs into the title.
+      identifier: "",
       title: info.title,
       subtitle: trimTo(subtitle, 180),
       url: `https://app.paseo.sh/h/${encodeURIComponent(host)}/agent/${encodeURIComponent(agentId)}`,

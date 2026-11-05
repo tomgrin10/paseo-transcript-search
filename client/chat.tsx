@@ -4,9 +4,9 @@ import type { PluginClientContext, PluginTimelineItemProps } from "@getpaseo/plu
 import { Icon, ScrollView } from "@getpaseo/plugin/client/ui";
 import { TOOL_ROW_KIND, ToolRowSchema, rowLine, toolRow, type ToolRow } from "../shared/chat";
 import { Marked, type Theme } from "./kit";
-import { mono, tabular } from "./theme";
+import { mono, tabular, withAlpha } from "./theme";
 
-const ROLE: Record<string, string> = { user: "User", assistant: "Agent", tool: "Tool", other: "Note" };
+const ROLE: Record<string, string> = { user: "You", assistant: "Agent", tool: "Tool", other: "Note" };
 
 function Detail({ row, theme }: { row: ToolRow; theme: Theme }) {
   const c = theme.colors;
@@ -27,10 +27,12 @@ function Detail({ row, theme }: { row: ToolRow; theme: Theme }) {
       <Text style={meta}>{`Searched ${row.searched} ${row.searched === 1 ? "session" : "sessions"}${row.truncated ? "; more matches exist" : ""}.`}</Text>
     </View>;
   }
+  // The agent read around a line it found; mark what it searched for when the call says.
+  const query = row.query ? { query: row.query, regex: false, caseSensitive: false, ranked: true } : null;
   return <View style={{ gap: 10 }}>
-    {row.messages.map((message, index) => <View key={index} style={message.target ? { padding: 8, marginHorizontal: -8, borderRadius: 6, backgroundColor: c.surface2 } : undefined}>
-      <Text style={[meta, { fontWeight: "600" }]}>{message.role === "tool" && message.tool ? `Tool · ${message.tool}` : ROLE[message.role] ?? message.role}{message.target ? "  · match" : ""}</Text>
-      <Text selectable numberOfLines={message.target ? undefined : 5} style={[body, message.role === "tool" ? [mono, { fontSize: 12 }] : null]}>{message.text}</Text>
+    {row.messages.map((message, index) => <View key={index} style={message.target ? { paddingVertical: 6, paddingHorizontal: 8, marginHorizontal: -8, borderRadius: 6, backgroundColor: withAlpha(c.foreground, 0.05) } : undefined}>
+      <Text style={[meta, { fontWeight: "600", color: message.target ? c.foreground : c.foregroundMuted }]}>{message.role === "tool" && message.tool ? `Tool · ${message.tool}` : ROLE[message.role] ?? message.role}{message.target ? <Text style={meta}>  · the line it found</Text> : null}</Text>
+      <Marked value={message.text} query={message.target ? query : null} theme={theme} selectable numberOfLines={message.target ? undefined : 5} style={[body, message.role === "tool" ? [mono, { fontSize: 12 }] : null]} />
     </View>)}
   </View>;
 }

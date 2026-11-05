@@ -17,7 +17,9 @@ import { Empty, HostNotices, InstallHint, ListSkeleton, RecentSearches, StatusLi
 type Item = { kind: "group"; key: string; label: string; count: number } | { kind: "session"; key: string; result: SessionResult };
 
 /** Two panes from this width of the screen itself (not the window): results left, preview right. */
-const TWO_PANE_WIDTH = 900;
+const TWO_PANE_WIDTH = 720;
+/** Below this the filters scroll sideways in one row instead of wrapping. */
+const ONE_ROW_FILTERS = 1040;
 export const SEARCH_SCREEN = "search";
 const ROOT_ID = "transcript-search-screen";
 
@@ -33,6 +35,7 @@ export function SearchScreen({ theme, layout, navigation, params, openSettings }
   const list = useRef<FlatList<Item>>(null);
   const [width, setWidth] = useState(0);
   const wide = !compact && width >= TWO_PANE_WIDTH;
+  const narrowFilters = compact || (width > 0 && width < ONE_ROW_FILTERS);
   const [sheet, setSheet] = useState<Cursor | null>(null);
   const gutter = compact ? 16 : 24;
 
@@ -109,10 +112,10 @@ export function SearchScreen({ theme, layout, navigation, params, openSettings }
       <IconButton theme={theme} icon="Settings" label="Transcript Search settings" compact={compact} onPress={openSettings} />
     </View>
     {s.regexError ? <Text accessibilityRole="alert" style={[t.meta, { color: c.statusDanger }]}>That regular expression doesn't parse: {s.regexError}</Text> : null}
-    <FilterRow filters={s.filters} onChange={s.setFilters} hosts={s.options.hosts} hostIds={s.hostIds} onHosts={s.setHostIds} providers={s.options.providers} projects={s.options.projects} labels={s.options.labels} theme={theme} compact={compact} />
+    <FilterRow filters={s.filters} onChange={s.setFilters} hosts={s.options.hosts} hostIds={s.hostIds} onHosts={s.setHostIds} providers={s.options.providers} projects={s.options.projects} labels={s.options.labels} theme={theme} compact={compact} scroll={narrowFilters} />
     {s.history.isPending || s.regexError || (s.searchable && !searching && s.results.length === 0) ? null : <StatusLine theme={theme} sessions={s.searchable ? s.searchableSessions : s.results.length} hosts={s.scopeHostLabels} query={s.searchable ? s.shownQuery ?? s.filters.query : null}
       searching={searching} results={s.results.length} hostStates={searchStates} unsearchable={s.unsearchable} note={s.indexNote ?? fallbackNote}
-      refreshing={s.history.isFetching && !s.history.isPending} onRefresh={() => { void s.history.refetch(); void s.search.refetch(); }} />}
+      issues={s.history.issues} refreshing={s.history.isFetching && !s.history.isPending} onRefresh={() => { void s.history.refetch(); void s.search.refetch(); }} />}
     <HostNotices theme={theme} issues={s.history.issues} failures={failures} partial={partial} compact={compact} onRetry={() => { void s.history.refetch(); void s.search.refetch(); }} />
   </View>;
 
@@ -159,7 +162,7 @@ export function SearchScreen({ theme, layout, navigation, params, openSettings }
     data={s.history.isPending ? [] : items}
     keyExtractor={(item) => item.key}
     style={{ flex: 1, opacity: s.stale ? 0.55 : 1 }}
-    contentContainerStyle={{ paddingHorizontal: wide ? 12 : gutter - 8, paddingTop: 14, paddingBottom: 32 }}
+    contentContainerStyle={{ paddingHorizontal: wide && s.results.length > 0 ? 12 : gutter - 8, paddingTop: 14, paddingBottom: 32 }}
     keyboardShouldPersistTaps="handled"
     ListHeaderComponent={listHeader ? <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>{listHeader}</View> : null}
     ListEmptyComponent={empty}
@@ -171,11 +174,11 @@ export function SearchScreen({ theme, layout, navigation, params, openSettings }
 
   return <View nativeID={ROOT_ID} style={{ flex: 1, backgroundColor: c.surface0 }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
     {header}
-    {wide ? <View style={{ flex: 1, flexDirection: "row", minHeight: 0 }}>
-      <View style={{ flex: 44, minWidth: 360, maxWidth: 640 }}>{resultsList}</View>
+    {wide && s.results.length > 0 ? <View style={{ flex: 1, flexDirection: "row", minHeight: 0 }}>
+      <View style={{ flex: 44, minWidth: 320, maxWidth: 640 }}>{resultsList}</View>
       <View style={{ width: 1, backgroundColor: c.border }} />
       <View style={{ flex: 56, minWidth: 0 }}>
-        {s.results.length === 0 ? null : s.selected
+        {s.selected
           ? <Preview result={s.selected} snippet={s.cursor?.snippet ?? null} query={s.highlight} theme={theme} compact={false} nowMs={nowMs} canOpen={opener.canOpen} onOpen={open} onOpenWorkspace={opener.openWorkspace} />
           : s.history.isPending ? null : <Empty theme={theme} icon="PanelRight" title={s.searchable ? "Pick a line to read it in context" : "Pick a session to see how it went"} detail="↑ and ↓ move through the list; Enter opens the session." />}
       </View>

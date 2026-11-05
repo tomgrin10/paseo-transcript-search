@@ -1,34 +1,16 @@
 import { Icon } from "@getpaseo/plugin/client/ui";
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Snippet } from "../shared/contracts";
 import type { HighlightQuery } from "../shared/highlight";
 import { formatTimeAgo } from "../shared/model";
 import type { Cursor, SessionResult } from "../shared/results";
+import { snippetText } from "../shared/snippet-text";
 import { Chip, Marked, text, type Theme } from "./kit";
 import { tabular } from "./theme";
 
 export const SNIPPETS_SHOWN = 3;
 const ROLE: Record<Snippet["role"], string> = { user: "You", assistant: "Agent", tool: "Tool", other: "Note" };
-
-/** Codex logs shell output as escaped JSON; read it as the output it carries. */
-function unescapeToolJson(text: string): string {
-  return text.replace(/^\{"output":"/, "").replace(/\\n/g, " ").replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
-}
-
-/** Keeps the match near the start of a two-line row: the server leaves up to 120 characters before it. */
-export const LEAD_CHARS = 56;
-export function snippetText(snippet: Snippet): { value: string; fallback: { start: number; end: number } | null } {
-  const clean = snippet.role === "tool" ? unescapeToolJson : (text: string) => text;
-  let before = clean(snippet.before);
-  if (snippet.match && before.length > LEAD_CHARS) {
-    const cut = before.slice(before.length - LEAD_CHARS);
-    const space = cut.indexOf(" ");
-    before = `…${(space > 0 && space < 20 ? cut.slice(space + 1) : cut).trimStart()}`;
-  }
-  const value = `${before}${snippet.match}${clean(snippet.after)}`;
-  return { value, fallback: snippet.match ? { start: before.length, end: before.length + snippet.match.length } : null };
-}
 
 function transcriptNote(result: SessionResult): string | null {
   const t = result.agent.transcript;
@@ -46,7 +28,7 @@ export interface SessionRowProps {
   compact: boolean;
   nowMs: number;
   onSelect(cursor: Cursor): void;
-  /** Double click or a second press on the selected line. */
+  /** A double click on a line (desktop). */
   onOpen(result: SessionResult): void;
 }
 
@@ -59,8 +41,14 @@ function SessionRowImpl({ result, cursor, query, theme, compact, nowMs, onSelect
   const more = (result.match?.hitCount ?? 0) - snippets.length;
   const ago = formatTimeAgo(result.activityMs, nowMs);
   const note = query ? null : transcriptNote(result);
+  // A click selects (the first result is selected for you, so a click must never open by itself);
+  // two clicks on the same line within a moment open it, like a file list.
+  const lastPress = useRef<{ snippet: number | null; at: number } | null>(null);
   const press = (snippet: number | null) => {
-    if (selectedHere && cursor?.snippet === snippet && !compact) onOpen(result);
+    const now = Date.now();
+    const twice = !compact && lastPress.current !== null && lastPress.current.snippet === snippet && now - lastPress.current.at < 450;
+    lastPress.current = twice ? null : { snippet, at: now };
+    if (twice) onOpen(result);
     else onSelect({ key: result.key, snippet });
   };
   const headSelected = selectedHere && (snippets.length === 0 || cursor?.snippet === null);
@@ -77,8 +65,8 @@ function SessionRowImpl({ result, cursor, query, theme, compact, nowMs, onSelect
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 }}>
         <View style={{ flexShrink: 0 }}><Chip theme={theme} icon="Server" label={result.host.label} /></View>
         <Marked value={[result.info.workspaceTitle, result.info.projectName, result.info.providerLabel].filter((part, index, all) => Boolean(part) && all.indexOf(part) === index).join(" · ")} query={result.nameMatch ? query : null} theme={theme} numberOfLines={1} style={[t.meta, { flexShrink: 1 }]} />
-        {note ? <Text style={[t.small, { flexShrink: 0 }]} numberOfLines={1}>· {note}</Text> : null}
       </View>
+      {note ? <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}><Icon name="FileX" size={11} color={c.foregroundMuted} /><Text style={t.small} numberOfLines={1}>{note}</Text></View> : null}
     </Pressable>
     {snippets.map((snippet, index) => {
       const on = selectedHere && cursor?.snippet === index;
@@ -88,8 +76,7 @@ function SessionRowImpl({ result, cursor, query, theme, compact, nowMs, onSelect
         accessibilityLabel={`${ROLE[snippet.role]} line ${snippet.lineNumber}: ${value.slice(0, 120)}`}
         onPress={() => press(index)}
         style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => ({ flexDirection: "row", alignItems: "flex-start", gap: 10, marginHorizontal: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6,
-          backgroundColor: on && !compact ? c.surface2 : pressed ? c.surface2 : hovered ? (selectedHere ? c.surface2 : c.surface1) : "transparent",
-          ...(on && !compact ? { boxShadow: `0px 0px 0px 1px ${c.border}` } : {}) } as object)}>
+          backgroundColor: on && !compact ? c.surface2 : pressed ? c.surface2 : hovered ? (selectedHere ? c.surface2 : c.surface1) : "transparent" } as object)}>
         <Text numberOfLines={1} style={[t.small, { width: compact ? 40 : 44, paddingTop: 1, color: on ? c.foreground : c.foregroundMuted }]}>{role}</Text>
         <Marked value={value} fallback={fallback} query={query} theme={theme} numberOfLines={compact ? 3 : 2} style={[t.body, { flex: 1, fontSize: 13, lineHeight: 19, color: on ? c.foreground : c.foregroundMuted }]} />
       </Pressable>;

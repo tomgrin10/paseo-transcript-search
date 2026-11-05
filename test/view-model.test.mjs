@@ -115,3 +115,15 @@ test("agent tool calls become one-line rows for Claude and Codex names", async (
   assert.equal(rowLine(read), "Read “Fix duplicate webhook deliveries” around line 9");
   assert.deepEqual(read.messages.map((message) => message.target), [false, true]);
 });
+
+test("result lines lead with the match and read Codex shell output, not its JSON envelope", async () => {
+  const { snippetText, LEAD_CHARS } = await load("shared/snippet-text.ts");
+  const long = snippetText({ role: "assistant", before: "…" + "word ".repeat(40), match: "idempotency", after: " key." });
+  assert.ok(long.value.indexOf("idempotency") <= LEAD_CHARS + 2);
+  assert.equal(long.value.slice(long.fallback.start, long.fallback.end), "idempotency");
+  const envelope = snippetText({ role: "tool", before: '{"output":"diff --git a/retry.ts\\n+ const ', match: "idempotency", after: 'Key = 1;\\n","metadata":{"exit_code":0,"duration_seconds":1.2}}' });
+  assert.equal(envelope.value, "diff --git a/retry.ts + const idempotencyKey = 1; ");
+  assert.equal(envelope.value.slice(envelope.fallback.start, envelope.fallback.end), "idempotency");
+  const plain = snippetText({ role: "tool", before: "PASS ", match: "retry", after: ".test.ts" });
+  assert.equal(plain.value, "PASS retry.test.ts", "ordinary tool output is left alone");
+});

@@ -30,6 +30,8 @@ export interface StatusProps {
   /** Sessions shown for the query. */
   results: number;
   hostStates: readonly HostSearchState[];
+  /** Hosts left out of the answer entirely (offline, no plugin). */
+  issues?: readonly HostIssue[];
   unsearchable: number;
   note: string | null;
   refreshing: boolean;
@@ -37,10 +39,10 @@ export interface StatusProps {
 }
 
 /** One sentence that says what was searched and what came back, host by host. */
-export function StatusLine({ theme, sessions, hosts, query, searching, results, hostStates, unsearchable, note, refreshing, onRefresh }: StatusProps) {
+export function StatusLine({ theme, sessions, hosts, query, searching, results, hostStates, issues = [], unsearchable, note, refreshing, onRefresh }: StatusProps) {
   const c = theme.colors;
   const t = text(c);
-  const multi = hostStates.length > 1;
+  const multi = hostStates.length + issues.length > 1;
   const sentence = query === null
     ? `${pluralize(sessions, "session")} on ${hostNames(hosts)}`
     : searching && results === 0
@@ -50,6 +52,7 @@ export function StatusLine({ theme, sessions, hosts, query, searching, results, 
     <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4, minWidth: 0 }}>
       <Text accessibilityRole="summary" accessibilityLiveRegion="polite" style={[t.meta, { color: c.foreground, flexShrink: 1 }]} numberOfLines={2}>{sentence}</Text>
       {query !== null && multi ? hostStates.map((host) => <HostCount key={host.id} host={host} theme={theme} />) : null}
+      {multi ? issues.map((issue) => <Chip key={issue.id} theme={theme} icon="TriangleAlert" color={c.statusWarning} label={`${issue.label} ${ISSUE_CHIPS[issue.kind]}`} />) : null}
       {query !== null && unsearchable > 0 ? <Text style={t.small}>{pluralize(unsearchable, "session")} without a transcript</Text> : null}
       {note ? <Text style={t.small}>{note}</Text> : null}
     </View>
@@ -69,6 +72,8 @@ function HostCount({ host, theme }: { host: HostSearchState; theme: Theme }) {
   if (host.state === "failed") return <Chip theme={theme} icon="TriangleAlert" color={c.statusWarning} label={`${host.label} failed`} />;
   return <Chip theme={theme} icon="Server" label={`${host.label} ${host.count}${host.state === "partial" ? "+" : ""}`} />;
 }
+
+const ISSUE_CHIPS: Record<HostIssue["kind"], string> = { offline: "offline", connecting: "unreachable", "missing-plugin": "not searched", failed: "failed", stale: "out of date" };
 
 export interface NoticeProps {
   theme: Theme;

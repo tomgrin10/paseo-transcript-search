@@ -38,14 +38,14 @@ export function contributeAgentTools(server: PluginServerContext) {
       return { text: JSON.stringify(result), structuredContent: result };
     },
   }), defineAgentTool({
-    name: "transcript_read_conversation", description: "Read the turns around one line of a conversation transcript on this host, using an agentId and line from transcript_search_conversations (pass its fileName for a subagent line). Without a line, returns how the session started and its last turns. Read-only; never restores or starts agents.",
-    input: z.object({ agentId: z.string().min(1), line: z.number().int().positive().optional(), fileName: z.string().min(1).max(300).optional(), radius: z.number().int().min(0).max(EXCERPT_MAX_RADIUS).default(3) }).strict(),
-    async execute({ agentId, line, fileName, radius }, { signal }) {
+    name: "transcript_read_conversation", description: "Read the turns around one line of a conversation transcript on this host, using an agentId and line from transcript_search_conversations (pass its fileName for a subagent line, and the query to centre a long message on it). Without a line, returns how the session started and its last turns. Read-only; never restores or starts agents.",
+    input: z.object({ agentId: z.string().min(1), line: z.number().int().positive().optional(), fileName: z.string().min(1).max(300).optional(), query: z.string().min(1).max(500).optional(), radius: z.number().int().min(0).max(EXCERPT_MAX_RADIUS).default(3) }).strict(),
+    async execute({ agentId, line, fileName, query, radius }, { signal }) {
       if (signal.aborted) throw new Error("Tool call cancelled.");
       const census = await buildCensus();
       const session = sessionIndex(census).get(agentId);
       if (!session) return { text: "No session with that agentId on this host.", isError: true };
-      const excerpt = await excerptForAgent(agentId, fileName, { lineNumber: line, radius, signal });
+      const excerpt = await excerptForAgent(agentId, fileName, { lineNumber: line, radius, signal, ...(query ? { query } : {}) });
       if (excerpt.error && excerpt.messages.length === 0) return { text: excerpt.error, isError: true };
       const host = await serverId();
       const body = [

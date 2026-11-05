@@ -60,7 +60,10 @@ export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen
   const ago = formatTimeAgo(result.activityMs, nowMs);
   const shown = result.match?.snippets.length ?? 0;
   const hits = result.match?.hitCount ?? 0;
-  const where = line ? `Line ${line.lineNumber}${line.file === "subagent" ? " in a subagent" : ""}${shown > 1 && snippet !== null ? ` · match ${snippet + 1} of ${Math.max(hits, shown)}` : ""}` : result.match ? "Name match" : "Opening and last turns";
+  const total = Math.max(hits, shown);
+  const where = line && snippet !== null
+    ? `${total > 1 ? `Match ${snippet + 1} of ${total}` : "The only match"}${line.file === "subagent" ? " · in a subagent" : ""}`
+    : result.nameMatch ? "Matched by its name · how it started and ended" : "How it started and ended";
 
   const copy = async () => {
     try { await copyText(excerptText(result, data)); toast.show("Copied the excerpt", { variant: "success" }); }
@@ -99,7 +102,7 @@ export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen
               <Message message={data.opening} label="Started with" theme={theme} query={query} />
               <Gap theme={theme} />
             </> : data.more || data.opening ? <Gap theme={theme} /> : null}
-            {data.messages.map((message, index) => <Message key={`${message.line}:${index}`} message={message} theme={theme} target={index === data.target} query={query} onTargetLayout={index === data.target ? onTarget : undefined} />)}
+            {data.messages.map((message, index) => <Message key={`${message.line}:${index}`} message={message} theme={theme} target={index === data.target} bleed={inSheet ? 8 : 12} query={query} onTargetLayout={index === data.target ? onTarget : undefined} />)}
             {line && data.target === null && data.messages.length > 0 ? <Text style={t.small}>The matched line holds no message text (it matched a record field).</Text> : null}
             {data.messages.length === 0 && !data.opening ? <Text style={t.meta}>{data.error ?? "Nothing readable in this session yet."}</Text> : null}
             {data.error && data.messages.length > 0 ? <Text style={t.small}>{data.error}</Text> : null}
@@ -134,7 +137,7 @@ function Gap({ theme }: { theme: Theme }) {
   </View>;
 }
 
-function Message({ message, theme, target = false, query, label, onTargetLayout }: { message: ExcerptMessage; theme: Theme; target?: boolean; query: HighlightQuery | null; label?: string; onTargetLayout?: (y: number, height: number) => void }) {
+function Message({ message, theme, target = false, bleed = 12, query, label, onTargetLayout }: { message: ExcerptMessage; theme: Theme; target?: boolean; bleed?: number; query: HighlightQuery | null; label?: string; onTargetLayout?: (y: number, height: number) => void }) {
   const c = theme.colors;
   const t = text(c);
   const when = clock(message.timestamp);
@@ -146,7 +149,7 @@ function Message({ message, theme, target = false, query, label, onTargetLayout 
   }
   const who = label ?? (message.role === "tool" ? `Tool${message.tool ? ` · ${message.tool}` : ""}` : ROLE[message.role]);
   return <View accessibilityLabel={target ? `Matched ${who.toLowerCase()} message` : undefined} onLayout={onTargetLayout ? (event) => onTargetLayout(event.nativeEvent.layout.y, event.nativeEvent.layout.height) : undefined}
-    style={target ? { padding: 12, marginHorizontal: -12, borderRadius: 8, backgroundColor: c.surface1, boxShadow: `0px 0px 0px 1px ${c.border}` } as object : undefined}>
+    style={target ? { padding: bleed, marginHorizontal: -bleed, borderRadius: 8, backgroundColor: c.surface1, boxShadow: `0px 0px 0px 1px ${c.border}` } as object : undefined}>
     <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 3 }}>
       <Text style={[t.label, { fontSize: 12, color: target ? c.foreground : c.foregroundMuted }]}>{who}</Text>
       {when ? <Text style={[t.small, tabular]}>{when}</Text> : null}

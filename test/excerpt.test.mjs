@@ -123,7 +123,8 @@ test("the composer's Past conversation source lists recent sessions and matches 
 
     const matched = await f.invoke("transcript-search.attach-search", { query: "idempotency" });
     assert.deepEqual(matched.items.map((item) => item.id), ["claude-1"]);
-    assert.match(matched.items[0].subtitle, /^“.*idempotency.*” · Invoice retry backoff · Claude$/, "Paseo's picker filters rows by what was typed, so the subtitle carries the match");
+    assert.match(matched.items[0].subtitle, /^“….{0,10}idempotency.*” · Invoice retry backoff · Claude · Oct 4$/, "Paseo's picker filters rows by what was typed, so the subtitle leads with the match");
+    assert.equal(matched.items[0].identifier, "", "the picker prints the identifier before the title");
     assert.match(matched.items[0].text, /Session: claude session\nAgent ID: claude-1 \(Claude\) on Paseo host srv_fixture/);
     assert.match(matched.items[0].text, /\[match\]/);
     assert.match(matched.items[0].text, /transcript_read_conversation/);
