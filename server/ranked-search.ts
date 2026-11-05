@@ -64,8 +64,12 @@ const META_SQL = `
   FROM agent_meta
   WHERE agent_meta MATCH ?1 AND agent_id IN (SELECT value FROM json_each(?2))`;
 
-const KINDS_SQL = "SELECT id, kind FROM files WHERE agent_id IN (SELECT value FROM json_each(?1))";
+const KINDS_SQL = "SELECT id, kind, path FROM files WHERE agent_id IN (SELECT value FROM json_each(?1))";
 const SEARCHABLE_SQL = "SELECT DISTINCT agent_id FROM files WHERE agent_id IN (SELECT value FROM json_each(?1))";
+
+function baseName(path: string): string {
+  return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
+}
 
 function toRole(value: string): SnippetRole {
   return value === "user" || value === "assistant" || value === "tool" ? value : "other";
@@ -128,8 +132,10 @@ export function rankedSearch(
     }
     const metaRows = db.prepare(META_SQL).all(orExpression, ids, MARK_START, MARK_END) as unknown as MetaRow[];
     const kinds = new Map<number, Snippet["file"]>();
-    for (const row of db.prepare(KINDS_SQL).all(ids) as { id: number; kind: string }[]) {
+    const names = new Map<number, string>();
+    for (const row of db.prepare(KINDS_SQL).all(ids) as { id: number; kind: string; path: string }[]) {
       kinds.set(Number(row.id), row.kind === "subagent" ? "subagent" : "main");
+      names.set(Number(row.id), baseName(row.path));
     }
 
     const agents = new Map<string, AgentScore>();
@@ -151,6 +157,7 @@ export function rankedSearch(
         const parts = splitSnippetMarkers(row.snip);
         entry.snippets.push({
           file: kinds.get(Number(row.file_id)) ?? "main",
+          ...(names.has(Number(row.file_id)) ? { fileName: names.get(Number(row.file_id)) } : {}),
           lineNumber: Math.max(1, Number(row.line) || 1),
           role: toRole(row.role),
           before: collapseWhitespace(parts.before),

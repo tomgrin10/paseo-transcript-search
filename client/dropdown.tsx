@@ -1,5 +1,5 @@
 import type { PluginTheme } from "@getpaseo/plugin";
-import { Icon, Modal } from "@getpaseo/plugin/client/react-native";
+import { Icon, Modal } from "@getpaseo/plugin/client/ui";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Modal as NativeModal,
@@ -52,6 +52,10 @@ export interface DropdownProps {
   icon?: string;
   /** Phones get the host sheet; everything else gets an anchored popover. */
   compact: boolean;
+  /** Show the value even when nothing narrows (Sort: Newest first). */
+  alwaysShowValue?: boolean;
+  /** Overrides whether the trigger reads as narrowing (a non-default sort). */
+  highlighted?: boolean;
 }
 
 export function Dropdown({
@@ -65,8 +69,10 @@ export function Dropdown({
   theme,
   icon,
   compact,
+  alwaysShowValue = false,
+  highlighted,
 }: DropdownProps) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, compact), [theme, compact]);
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
@@ -91,7 +97,7 @@ export function Dropdown({
   }, [compact]);
   const close = useCallback(() => setOpen(false), []);
   // A single-select always has one row checked; only a narrowing choice counts as active.
-  const active = summary !== null;
+  const active = highlighted ?? summary !== null;
   const value = summary ?? "All";
 
   const rows = (
@@ -147,21 +153,10 @@ export function Dropdown({
           pressed ? styles.triggerPressed : null,
         ]}
       >
-        {icon ? (
-          <Icon
-            name={icon}
-            size={12}
-            color={active ? theme.colors.foreground : theme.colors.foregroundMuted}
-          />
-        ) : null}
-        <Text style={styles.triggerLabel} numberOfLines={1}>
-          {label}
-        </Text>
-        <Text
-          style={[styles.triggerValue, active ? styles.triggerValueActive : null]}
-          numberOfLines={1}
-        >
-          {value}
+        {icon ? <Icon name={icon} size={13} color={active ? theme.colors.foreground : theme.colors.foregroundMuted} /> : null}
+        <Text style={[styles.triggerLabel, active ? styles.triggerLabelActive : null]} numberOfLines={1}>
+          {summary !== null || alwaysShowValue ? `${label}: ` : label}
+          {summary !== null || alwaysShowValue ? <Text style={active ? styles.triggerValueActive : styles.triggerValue}>{value}</Text> : null}
         </Text>
         <Icon name="ChevronDown" size={12} color={theme.colors.foregroundMuted} />
       </Pressable>
@@ -245,7 +240,7 @@ function Row({
       ]}
     >
       <View style={styles.check}>
-        {checked ? <Icon name="Check" size={14} color={theme.colors.accent} /> : null}
+        {checked ? <Icon name="Check" size={14} color={theme.colors.foreground} /> : null}
       </View>
       {icon ? <Icon name={icon} size={13} color={iconColor ?? theme.colors.foregroundMuted} /> : null}
       <Text style={styles.rowLabel} numberOfLines={1}>
@@ -278,27 +273,28 @@ function popoverPlacement(
 
 type DropdownStyles = ReturnType<typeof createStyles>;
 
-function createStyles(theme: PluginTheme) {
+function createStyles(theme: PluginTheme, compactHeight = false) {
   return StyleSheet.create({
     trigger: {
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
-      minHeight: 32,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      borderRadius: 8,
-      borderWidth: StyleSheet.hairlineWidth,
+      minHeight: compactHeight ? 36 : 30,
+      paddingVertical: 4,
+      paddingHorizontal: 11,
+      borderRadius: 999,
+      borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface1,
-      maxWidth: "100%",
+      backgroundColor: "transparent",
+      maxWidth: 280,
     },
-    triggerActive: { borderColor: theme.colors.accent },
-    triggerHovered: { backgroundColor: theme.colors.surface2 },
-    triggerPressed: { opacity: 0.8 },
-    triggerLabel: { color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "600" },
-    triggerValue: { color: theme.colors.foregroundMuted, fontSize: 12, flexShrink: 1 },
+    triggerActive: { borderColor: theme.colors.foreground, backgroundColor: theme.colors.surface2 },
+    triggerHovered: { backgroundColor: theme.colors.surface1 },
+    triggerPressed: { backgroundColor: theme.colors.surface2 },
+    triggerLabel: { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 16, fontWeight: "500", flexShrink: 1 },
+    triggerLabelActive: { color: theme.colors.foregroundMuted },
     triggerValueActive: { color: theme.colors.foreground, fontWeight: "600" },
+    triggerValue: { color: theme.colors.foreground },
 
     backdrop: { ...StyleSheet.absoluteFillObject },
     popover: {
@@ -334,15 +330,15 @@ function createStyles(theme: PluginTheme) {
     done: {
       alignSelf: "flex-end",
       marginTop: 8,
-      minHeight: 34,
+      minHeight: 44,
       paddingVertical: 8,
       paddingHorizontal: 16,
-      borderRadius: 9,
+      borderRadius: 8,
       backgroundColor: theme.colors.accent,
       alignItems: "center",
       justifyContent: "center",
     },
     donePressed: { opacity: 0.85 },
-    doneText: { color: theme.colors.accentForeground, fontSize: 13, fontWeight: "700" },
+    doneText: { color: theme.colors.accentForeground, fontSize: 14, fontWeight: "600" },
   });
 }

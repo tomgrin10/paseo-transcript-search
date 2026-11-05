@@ -5,9 +5,23 @@ import { hostKey, mergeSearch, scopeSearch, sourceKey } from "../shared/host-mod
 import { searchAll } from "../shared/search-all";
 import { rpcForHost, type SearchHost } from "./federation";
 
-const DEBOUNCE_MS = 400;
+/** Short enough to feel live, long enough not to start a grep per keystroke. */
+const DEBOUNCE_MS = 250;
 export const MIN_QUERY_LENGTH = 2;
 export function isSearchable(query: string): boolean { return query.trim().length >= MIN_QUERY_LENGTH; }
+
+/** How one host's part of a search went. `partial` hit the output cap; results are incomplete. */
+export interface HostSearchState {
+  id: string; label: string;
+  state: "searching" | "done" | "partial" | "failed";
+  /** Sessions with a match on this host. */
+  count: number;
+  /** Sessions asked about on this host. */
+  sessions: number;
+  message?: string;
+  fallback?: boolean;
+  relaxed?: boolean;
+}
 
 export interface SearchOptions {
   query: string; mode: SearchMode; regex: boolean; caseSensitive: boolean;
@@ -41,6 +55,8 @@ export function useHistorySearch(hosts: readonly SearchHost[], options: SearchOp
     },
     enabled,
     staleTime: 60_000,
+    // grep stood in while the index was empty: ask again until the ranked answer is there.
+    refetchInterval: (query: { state: { data?: { fallback?: string } } }) => (query.state.data?.fallback === "index-empty" ? 3_000 : false),
     retry: 1,
     retryDelay: 1_000,
   })) });
@@ -64,11 +80,20 @@ export function useHistorySearch(hosts: readonly SearchHost[], options: SearchOp
     if (answer.relaxed) notes.push("showing matches for any word");
     return notes.length ? [`${host.label}: ${notes.join("; ")}`] : [];
   });
+  const hostStates: HostSearchState[] = targets.map((host, index) => {
+    const query = queries[index];
+    const answer = current ? query.data : undefined;
+    if (!enabled || !current) return { id: host.serverId, label: host.label, state: "searching", count: 0, sessions: host.ids.length };
+    if (query.isError) return { id: host.serverId, label: host.label, state: "failed", count: 0, sessions: host.ids.length, message: query.error instanceof Error ? query.error.message : undefined };
+    if (answer?.error) return { id: host.serverId, label: host.label, state: "failed", count: answer.matches.length, sessions: host.ids.length, message: answer.error.message };
+    if (!answer || query.isFetching) return { id: host.serverId, label: host.label, state: "searching", count: answer?.matches.length ?? 0, sessions: host.ids.length };
+    return { id: host.serverId, label: host.label, state: answer.outputTruncated ? "partial" : "done", count: answer.matches.length, sessions: host.ids.length, ...(answer.fallback ? { fallback: true } : {}), ...(answer.relaxed ? { relaxed: true } : {}) };
+  });
   const completedHosts = enabled ? queries.filter(query => query.isSuccess && !query.data?.error).length : 0;
   const missingHosts = enabled ? targets.filter((_, index) => !queries[index].data || queries[index].isError).map(host => host.serverId) : [];
   const failedAgentIds = new Set(targets.flatMap(host => missingHosts.includes(host.serverId) ? host.ids.map(id => hostKey(host.serverId, id)) : []));
   return {
-    matches, result, warnings, failedAgentIds, completedHosts, targetHosts: targets.length,
+    matches, result, warnings, failedAgentIds, hostStates, searchedQuery: current ? debouncedQuery : null, completedHosts, targetHosts: targets.length,
     waiting: isSearchable(options.query) && (options.query !== debouncedQuery || pending),
     error: current && result === null && warnings.length ? warnings.join(" · ") : null, flush,
     refetch: () => Promise.allSettled(queries.filter(query => enabled).map(query => query.refetch())),

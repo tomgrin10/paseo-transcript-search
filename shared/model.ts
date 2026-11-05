@@ -427,3 +427,34 @@ const PROVIDER_LABELS: Record<string, string> = {
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+function startOfDay(ms: number): number {
+  const date = new Date(ms);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+/** `Today`, `Yesterday`, `Oct 30`, or `Oct 30 2024` in another year. */
+export function shortDate(value: string | number | null | undefined, nowMs: number): string {
+  const ms = typeof value === "number" ? value : parseTime(value);
+  if (!ms) return "Unknown date";
+  const days = Math.round((startOfDay(nowMs) - startOfDay(ms)) / DAY_MS);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  const date = new Date(ms);
+  const label = `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+  return date.getFullYear() === new Date(nowMs).getFullYear() ? label : `${label} ${date.getFullYear()}`;
+}
+
+export const DAY_GROUPS = ["Today", "Yesterday", "This week", "This month", "Earlier"] as const;
+export type DayGroup = (typeof DAY_GROUPS)[number];
+
+/** The recency bucket a result list is grouped under. */
+export function dayGroup(ms: number, nowMs: number): DayGroup {
+  const days = Math.round((startOfDay(nowMs) - startOfDay(ms)) / DAY_MS);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return "This week";
+  if (days < 31) return "This month";
+  return "Earlier";
+}
