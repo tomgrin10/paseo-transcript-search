@@ -32,7 +32,7 @@
     "shared/",
     "LICENSE",
     "README.md",
-    "docs/"
+    "docs/media/"
   ],
   "repository": {
     "type": "git",

@@ -1,6 +1,16 @@
 {
   "id": "transcript-search",
+  "name": "Transcript Search",
   "icon": "assets/icon.png",
+  "description": "Find what was said in any past session, active or archived, on every connected host: marked matches, a preview in context, open or restore on the original host, attach a past conversation from the composer, and search tools for agents.",
+  "media": [
+    "docs/media/transcript-search-hero.png",
+    "docs/media/transcript-search-flow.gif",
+    "docs/media/transcript-search-attach.png",
+    "docs/media/transcript-search-chat.png",
+    "docs/media/transcript-search-hosts.png",
+    "docs/media/transcript-search-mobile.png"
+  ],
   "requirements": {
     "paseo": ">=0.14.0"
   }

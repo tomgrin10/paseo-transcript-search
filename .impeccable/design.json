@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T00:00:00Z",
+  "title": "Design System: Transcript Search",
+  "extensions": {
+    "hostColors": {
+      "note": "No colour primitives: every colour is a host theme token, or one at an alpha, via client/theme.ts.",
+      "tokens": [
+        "surface0",
+        "surface1",
+        "surface2",
+        "border",
+        "foreground",
+        "foregroundMuted",
+        "accent",
+        "accentForeground",
+        "statusWarning",
+        "statusDanger"
+      ],
+      "derived": [
+        {
+          "name": "mark-wash",
+          "value": "foreground @ 0.13 light / 0.17 dark",
+          "purpose": "Background of every matched word (markStyle), with foreground text, 600, 3px corners."
+        },
+        {
+          "name": "tint",
+          "value": "hue @ 0.12 light / 0.16 dark",
+          "purpose": "Chip fills (neutral on foregroundMuted, amber on statusWarning) and the host notice band."
+        },
+        {
+          "name": "accent-hover",
+          "value": "accent @ 0.92",
+          "purpose": "Primary button hover."
+        },
+        {
+          "name": "accent-press",
+          "value": "accent @ 0.85",
+          "purpose": "Primary button press."
+        },
+        {
+          "name": "chat-found-line",
+          "value": "foreground @ 0.05",
+          "purpose": "The line an agent tool found, in an expanded chat row."
+        },
+        {
+          "name": "key-hint",
+          "value": "button text @ 0.70",
+          "purpose": "Trailing ↵ on a desktop button."
+        }
+      ],
+      "isLight": "relative luminance of surface0 > 0.4; unknown counts as dark"
+    },
+    "shadows": [
+      {
+        "name": "raised-light",
+        "value": "0px 0px 0px 1px rgba(0,0,0,0.07), 0px 1px 2px -1px rgba(0,0,0,0.06), 0px 2px 6px 0px rgba(0,0,0,0.04)",
+        "purpose": "Search field, secondary buttons, cards on light grounds."
+      },
+      {
+        "name": "raised-dark",
+        "value": "0px 0px 0px 1px rgba(255,255,255,0.08)",
+        "purpose": "The same on dark grounds."
+      },
+      {
+        "name": "field-focus",
+        "value": "0px 0px 0px 1px foregroundMuted",
+        "purpose": "Replaces raised while the search field has focus."
+      },
+      {
+        "name": "matched-message",
+        "value": "0px 0px 0px 1px border, on surface1",
+        "purpose": "The preview message containing the match."
+      },
+      {
+        "name": "popover",
+        "value": "shadowColor #000, opacity 0.18, radius 12px, offset 0 4px; hairline border",
+        "purpose": "Dropdown menus; the only floating layer."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Every transition; opacity and transform only, skipped under reduced motion."
+      },
+      {
+        "name": "press",
+        "value": "scale 0.97, 140ms",
+        "purpose": "PressScale on every button, icon button and toggle."
+      },
+      {
+        "name": "reveal",
+        "value": "opacity + translateY 6px->0, 280ms",
+        "purpose": "Preview excerpt arriving after load."
+      },
+      {
+        "name": "icon-swap",
+        "value": "opacity + scale 0.4->1, 260ms",
+        "purpose": "An icon changing key."
+      },
+      {
+        "name": "skeleton",
+        "value": "opacity 0.55<->1, 800ms ease-in-out loop",
+        "purpose": "Loading placeholders; static under reduced motion."
+      },
+      {
+        "name": "stale",
+        "value": "opacity 0.55",
+        "purpose": "Results and excerpt held while a newer answer loads."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "host layout.compact",
+        "purpose": "Touch sizing: 44px controls, 16px gutter, 16px field text, preview as a sheet."
+      },
+      {
+        "name": "two-pane",
+        "value": "720px",
+        "purpose": "Screen's own width (onLayout), not compact: results flex 44 (320-640px) | preview flex 56."
+      },
+      {
+        "name": "filters-wrap",
+        "value": "1040px",
+        "purpose": "At and above, filters wrap with Sort pushed right; below, one sideways-scrolling row."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "The editor-style find box: surface1, raised, 42px, 10px corners, match options inside; focus is a muted ring around the whole box. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<div class=\"ds-field\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input class=\"ds-field-input\" value=\"idempotency\" aria-label=\"Search all session transcripts\" placeholder=\"Search what was said in any session…\"><span class=\"ds-field-sep\"></span><button class=\"ds-toggle\" aria-pressed=\"false\" aria-label=\"Match case\">Aa</button><button class=\"ds-toggle ds-toggle-on\" aria-pressed=\"true\" aria-label=\"Regular expression\">.*</button></div>",
+      "css": ".ds-field { display:flex; align-items:center; gap:6px; min-height:42px; padding:0 6px 0 12px; border-radius:10px; background:#222222; box-shadow:0 0 0 1px rgba(255,255,255,0.08); color:#9a9a9a; } .ds-field:focus-within { box-shadow:0 0 0 1px #9a9a9a; } .ds-field-input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:#e8e8e8; font:400 14px system-ui, sans-serif; padding:8px 0; } .ds-field-input::placeholder { color:#9a9a9a; } .ds-field-sep { width:1px; height:18px; background:#333333; margin:0 2px; } .ds-toggle { width:28px; height:28px; border-radius:6px; border:none; background:transparent; color:#9a9a9a; font:500 12px ui-monospace, monospace; cursor:pointer; transition:transform 140ms cubic-bezier(0.16,1,0.3,1), background 140ms; } .ds-toggle:hover { background:#222222; } .ds-toggle:active { background:#2b2b2b; transform:scale(0.97); } .ds-toggle-on { background:#2b2b2b; box-shadow:inset 0 0 0 1px #e8e8e8; color:#e8e8e8; } .ds-toggle:focus-visible { outline:2px solid #e8e8e8; outline-offset:2px; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Accent fill, 32px, 6px corners, trailing key hint; only for Open, Restore and Done. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<button class=\"ds-btn-primary\">Open session <span class=\"ds-btn-hint\">↵</span></button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:0 11px; border-radius:6px; border:none; background:#2f8f4e; color:#ffffff; font:600 13px/16px system-ui, sans-serif; cursor:pointer; transition:transform 140ms cubic-bezier(0.16,1,0.3,1), opacity 140ms; } .ds-btn-primary:hover { opacity:0.92; } .ds-btn-primary:active { opacity:0.85; transform:scale(0.97); } .ds-btn-primary:focus-visible { outline:2px solid #e8e8e8; outline-offset:2px; } .ds-btn-hint { font-size:12px; opacity:0.7; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Default kit button: surface1 with the raised ring, 32px, 6px corners, 97% press. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<button class=\"ds-btn\">Copy excerpt</button>",
+      "css": ".ds-btn { min-height:32px; padding:0 11px; border-radius:6px; border:none; background:#222222; box-shadow:0 0 0 1px rgba(255,255,255,0.08); color:#e8e8e8; font:500 13px/16px system-ui, sans-serif; cursor:pointer; transition:transform 140ms cubic-bezier(0.16,1,0.3,1), background 140ms; } .ds-btn:hover { background:#2b2b2b; } .ds-btn:active { background:#2b2b2b; transform:scale(0.97); } .ds-btn:focus-visible { outline:2px solid #e8e8e8; outline-offset:2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-small",
+      "description": "Transparent until hover; Workspace, Retry, Clear, Cancel. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<button class=\"ds-btn-ghost\">Retry</button>",
+      "css": ".ds-btn-ghost { min-height:28px; padding:0 9px; border-radius:6px; border:none; background:transparent; color:#e8e8e8; font:500 12px/16px system-ui, sans-serif; cursor:pointer; transition:transform 140ms cubic-bezier(0.16,1,0.3,1), background 140ms; } .ds-btn-ghost:hover { background:#222222; } .ds-btn-ghost:active { background:#2b2b2b; transform:scale(0.97); } .ds-btn-ghost:focus-visible { outline:2px solid #e8e8e8; outline-offset:2px; }"
+    },
+    {
+      "name": "Filter Trigger",
+      "kind": "chip",
+      "refersTo": "filter-trigger",
+      "description": "Pill outline in border; active is a foreground ring on surface2, never accent. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<div class=\"ds-filters\"><button class=\"ds-filter\"><span class=\"ds-filter-label\">Project</span></button><button class=\"ds-filter ds-filter-on\"><span class=\"ds-filter-label\">Sort:</span> <span class=\"ds-filter-value\">Best match</span></button></div>",
+      "css": ".ds-filters { display:flex; gap:8px; } .ds-filter { min-height:30px; padding:4px 11px; border-radius:999px; border:1px solid #333333; background:transparent; font:500 12px/16px system-ui, sans-serif; cursor:pointer; transition:transform 140ms cubic-bezier(0.16,1,0.3,1), background 140ms; } .ds-filter-label { color:#9a9a9a; } .ds-filter-value { color:#e8e8e8; font-weight:600; } .ds-filter:hover { background:#222222; } .ds-filter:active { background:#2b2b2b; transform:scale(0.97); } .ds-filter-on { border-color:#e8e8e8; background:#2b2b2b; } .ds-filter:focus-visible { outline:2px solid #e8e8e8; outline-offset:2px; }"
+    },
+    {
+      "name": "Host and Count Chips",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Text and icon in one hue on that hue at 12% light / 16% dark; amber only for a host that needs the user. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<span class=\"ds-chip\">Laptop 5</span> <span class=\"ds-chip ds-chip-warn\">Build server failed</span>",
+      "css": ".ds-chip { display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border-radius:999px; background:rgba(154,154,154,0.16); color:#9a9a9a; font:600 11px/16px system-ui, sans-serif; font-variant-numeric:tabular-nums; } .ds-chip-warn { background:rgba(217,164,65,0.16); color:#d9a441; }"
+    },
+    {
+      "name": "Session Row with Ink-Marked Lines",
+      "kind": "custom",
+      "refersTo": "session-row",
+      "description": "Signature: session head, host chip, then matched lines with the ink mark; selection is a surface wash. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<div class=\"ds-session ds-session-on\"><div class=\"ds-session-head\"><span class=\"ds-session-title\">Add per-tenant rate limits</span><span class=\"ds-session-ago\">35m</span></div><div class=\"ds-session-meta\"><span class=\"ds-chip-n\">Build server</span> Rate limiter rollout · api-gateway · Claude</div><button class=\"ds-line ds-line-on\"><span class=\"ds-role\">Agent</span><span class=\"ds-text\">…retrying a POST is only safe with an <mark class=\"ds-mark\">Idempotency</mark>-Key header…</span></button><button class=\"ds-line\"><span class=\"ds-role\">You</span><span class=\"ds-text\">…reuse the same <mark class=\"ds-mark\">idempotency</mark> key on every retry…</span></button></div>",
+      "css": ".ds-session { border-radius:10px; padding:4px 0; font-family:system-ui, sans-serif; } .ds-session-on { background:#222222; } .ds-session-head { display:flex; gap:8px; padding:6px 12px 0; } .ds-session-title { flex:1; color:#e8e8e8; font:600 14px/19px system-ui, sans-serif; } .ds-session-ago, .ds-session-meta { color:#9a9a9a; font:400 12px/17px system-ui, sans-serif; font-variant-numeric:tabular-nums; } .ds-session-meta { padding:3px 12px 4px; } .ds-chip-n { padding:1px 6px; border-radius:999px; background:rgba(154,154,154,0.16); font:600 11px/16px system-ui, sans-serif; margin-right:6px; } .ds-line { display:flex; gap:10px; width:calc(100% - 8px); margin:0 4px; padding:5px 8px; border:none; border-radius:6px; background:transparent; text-align:left; cursor:pointer; } .ds-line:hover { background:#2b2b2b; } .ds-line-on { background:#2b2b2b; } .ds-line:focus-visible { outline:2px solid #e8e8e8; outline-offset:1px; } .ds-role { width:44px; flex:none; padding-top:1px; color:#9a9a9a; font:400 11px/15px system-ui, sans-serif; } .ds-line-on .ds-role, .ds-line-on .ds-text { color:#e8e8e8; } .ds-text { flex:1; color:#9a9a9a; font:400 13px/19px system-ui, sans-serif; } .ds-mark { color:#e8e8e8; background:rgba(232,232,232,0.17); font-weight:600; border-radius:3px; }"
+    },
+    {
+      "name": "Preview Matched Message",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The message holding the match, lifted on surface1 with a border ring, between muted surrounding turns. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<div class=\"ds-excerpt\"><div class=\"ds-msg\"><div class=\"ds-msg-head\"><b>Agent</b><span>7:57 PM</span></div><p>I'll use a token bucket in Redis keyed by tenant ID.</p></div><div class=\"ds-msg ds-msg-target\"><div class=\"ds-msg-head\"><b>Agent</b><span>8:15 PM</span><span class=\"ds-msg-tag\">· match</span></div><p>Retrying a POST is only safe with an <mark class=\"ds-mark\">Idempotency</mark>-Key header.</p></div></div>",
+      "css": ".ds-excerpt { display:flex; flex-direction:column; gap:14px; font-family:system-ui, sans-serif; } .ds-msg p { margin:0; color:#e8e8e8; font:400 13px/19px system-ui, sans-serif; } .ds-msg-head { display:flex; align-items:baseline; gap:8px; margin-bottom:3px; color:#9a9a9a; font:400 11px/15px system-ui, sans-serif; font-variant-numeric:tabular-nums; } .ds-msg-head b { font:600 12px/18px system-ui, sans-serif; } .ds-msg-target { padding:12px; margin:0 -12px; border-radius:8px; background:#222222; box-shadow:0 0 0 1px #333333; } .ds-msg-target .ds-msg-head b, .ds-msg-tag { color:#e8e8e8; } .ds-mark { color:#e8e8e8; background:rgba(232,232,232,0.17); font-weight:600; border-radius:3px; }"
+    },
+    {
+      "name": "Host Notice",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Amber-tinted band naming a host that needs the user, with at most one ghost action; other hosts' results stay up. Literals show a dark host theme; in code every colour is a host token.",
+      "html": "<div class=\"ds-notice\" role=\"alert\"><span class=\"ds-notice-icon\">!</span><span class=\"ds-notice-text\">Build server didn't finish searching: timed out</span><button class=\"ds-btn-ghost\">Retry</button></div>",
+      "css": ".ds-notice { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:8px; background:rgba(217,164,65,0.16); } .ds-notice-icon { color:#d9a441; font:700 13px system-ui, sans-serif; } .ds-notice-text { flex:1; color:#e8e8e8; font:400 12px/17px system-ui, sans-serif; } .ds-btn-ghost { min-height:28px; padding:0 9px; border-radius:6px; border:none; background:transparent; color:#e8e8e8; font:500 12px/16px system-ui, sans-serif; cursor:pointer; } .ds-btn-ghost:hover { background:#222222; } .ds-btn-ghost:focus-visible { outline:2px solid #e8e8e8; outline-offset:2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Find in Files, for Conversations",
+    "overview": "Transcript Search is a code editor's project search turned on session transcripts, with a mail client's reading pane beside it. A single field with its match options inside, one quiet row of filters, a sentence saying what was searched on which host, then results grouped by session with the lines that matched. Selecting a line shows it in its conversation on the right; Enter opens it on its own host. It lives inside Paseo and owns no colour, no font and no chrome of its own: the host's ground, ink and system sans, plus the plugin family's kit (raised cards, tinted chips, 97% press, neutral selection).\n\nDensity is that of a working tool. Titles are 14–17px, the reading text is 13px, metadata 12px, and the only heavy marks on screen are the matched words themselves: foreground ink on a faint wash of foreground. The same mark travels from the result line into the preview and into chat rows, so the eye follows one thing.\n\nColour means something or it is absent. Green (the host accent) is the primary Open button and switches. Amber is a host that needs the user. Red is a parse error or a failed tool call. Everything else, selection included, is surfaces and ink.",
+    "keyCharacteristics": [
+      "Host theme tokens only; every derived colour is a token at an alpha.",
+      "The match is marked in ink (foreground on a 13% light / 17% dark foreground wash, 600 weight, 3px corners), never in accent.",
+      "Selection is a surface wash (surface1 for the session, surface2 for the line), never a ring or a hue.",
+      "Two panes from 720px of screen width; a sheet below it.",
+      "Keyboard first on desktop: `/`, ↑ ↓, Enter, Esc, with soft key hints at the foot of the preview."
+    ],
+    "rules": [
+      {
+        "name": "The Ink Mark Rule",
+        "body": "A matched word is `foreground` text on `foreground` at 13% (light) or 17% (dark), weight 600, 3px corners, wherever it appears: result lines, titles matched by name, the preview excerpt and chat rows. Never accent, never bold alone, never a second hue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Accent Is The Way Out Rule",
+        "body": "Accent green fills the primary action that leaves the screen or commits (Open, Restore, Done) and the on state of switches. It never marks selection, a match, a filter or a count.",
+        "section": "colors"
+      },
+      {
+        "name": "The Amber Asks Rule",
+        "body": "Amber appears only for a host that needs the user. A partial result from a healthy host is a `+` on its count chip, not a colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight Not Size Rule",
+        "body": "The ramp spans 11–17px. A new level is a weight or ink change inside that range, not a larger size.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Is For Machines Rule",
+        "body": "Monospace marks tool output, commands and paths only, at 12px. Prose quoted from an agent stays in the system sans even when it contains code spans.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Until Lifted Rule",
+        "body": "Rows are flat; selection and hover are fills. Only controls you type into or press, and the one floating menu, carry depth.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use only host theme tokens and alphas derived from them through `client/theme.ts`.",
+      "Do mark every matched word with `markStyle`: foreground on foreground at 13% light / 17% dark, 600, 3px corners, in results, preview and chat alike.",
+      "Do show selection as a surface wash: `surface1` for the session block, `surface2` for the selected line.",
+      "Do draw neutral selected controls (active filters, on toggles) as a `foreground` ring on `surface2`.",
+      "Do name the host of every result with a chip, and give each host its own count in the status sentence.",
+      "Do keep buttons at 28/32px with hit slop on desktop and 44px on compact layouts.",
+      "Do switch to two panes at 720px of the screen's own width, and to one sideways-scrolling filter row below 1040px.",
+      "Do honour reduced motion in every animation: PressScale, Reveal, IconSwap and Skeleton all go static."
+    ],
+    "donts": [
+      "Don't use accent green for anything but primary buttons and switches; never for selection, a match or a filter.",
+      "Don't use amber except for a host that needs the user.",
+      "Don't mark matches with bold alone or with a coloured highlight.",
+      "Don't stack workspace cards or put several rows of filter chips above the results.",
+      "Don't add drop shadows to rows or panes; the dropdown popover is the only floating layer.",
+      "Don't introduce a font family; monospace is for tool lines, commands and paths only."
+    ]
+  }
+}
