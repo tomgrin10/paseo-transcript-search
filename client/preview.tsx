@@ -5,7 +5,7 @@ import { attachItem, type Excerpt, type ExcerptMessage } from "../shared/contrac
 import type { HighlightQuery } from "../shared/highlight";
 import { formatTimeAgo } from "../shared/model";
 import { attachRequest, isSameSession, type SessionResult } from "../shared/results";
-import { ATTACH_SOURCE_ID, type AttachTarget, type ComposerLookup, firstComposer } from "./attach-target";
+import { ATTACH_SOURCE_ID, type AttachTarget, type ComposerLookup, attachError, firstComposer } from "./attach-target";
 import { rpcForHost } from "./federation";
 import { Button, Chip, Kbd, Marked, text, type Theme } from "./kit";
 import { Reveal, Skeleton } from "./motion";
@@ -26,14 +26,6 @@ export function excerptText(result: SessionResult, excerpt: Excerpt | undefined)
   const head = [result.info.title, [result.host.label, result.info.workspaceLine, result.info.providerLabel].filter(Boolean).join(" · ")].join("\n");
   const body = (excerpt?.messages ?? []).map((message) => `${message.role === "tool" && message.tool ? `Tool ${message.tool}` : ROLE[message.role]}: ${message.text}`).join("\n\n");
   return body ? `${head}\n\n${body}` : head;
-}
-
-/** A failed attach in words a person can act on, without the transport's request details. */
-export function attachError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : "";
-  if (/unknown (rpc|handler|method)|not registered|no handler|handler_not_found|unknown_rpc/i.test(raw)) return "That host can't attach yet. Update Transcript Search there, or copy the excerpt.";
-  const message = raw.replace(/^Request failed:\s*/i, "").replace(/\s+requestType=\S+.*$/, "").trim();
-  return message ? `Couldn't attach: ${message}` : "Couldn't attach this conversation. Copy the excerpt instead.";
 }
 
 export interface PreviewProps {
@@ -108,16 +100,22 @@ export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen
     }
   };
 
-  const actions = (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-      {canOpen ? <Button theme={theme} kind="primary" compact={compact} icon={archived ? "ArchiveRestore" : "ArrowUpRight"} title={archived ? "Restore and open" : "Open session"} trailing={compact ? undefined : "↵"}
-        accessibilityLabel={archived ? `Restore and open ${result.info.title} on ${result.host.label}` : `Open ${result.info.title} on ${result.host.label}`} onPress={() => onOpen(result)} /> : null}
-      {attachTarget ? <Button theme={theme} compact={compact} icon="Paperclip" loading={attaching} title={compact ? "Attach" : `Attach to ${attachTarget.label}`}
-        accessibilityLabel={`Attach ${line ? "this match" : "this conversation"} to ${attachTarget.label}`} accessibilityHint="Adds it to the message box, then returns you there" onPress={() => void attach()} /> : null}
-      <Button theme={theme} compact={compact} icon="Copy" title={compact || attachTarget ? "Copy" : "Copy excerpt"} accessibilityLabel="Copy the excerpt" disabled={!data || data.messages.length === 0} onPress={() => void copy()} />
-      {canOpen && !result.row.synthetic ? <Button theme={theme} kind="ghost" compact={compact} icon="FolderOpen" title="Workspace" accessibilityLabel={`Open the workspace ${result.info.workspaceTitle ?? ""}`} onPress={() => onOpenWorkspace(result)} /> : null}
-    </View>
-  );
+  const open = canOpen ? <Button theme={theme} kind="primary" compact={compact} icon={archived ? "ArchiveRestore" : "ArrowUpRight"} title={archived ? "Restore and open" : "Open session"} trailing={compact ? undefined : "↵"}
+    grow={compact && attachTarget !== null}
+    accessibilityLabel={archived ? `Restore and open ${result.info.title} on ${result.host.label}` : `Open ${result.info.title} on ${result.host.label}`} onPress={() => onOpen(result)} /> : null;
+  const secondary = <>
+    {attachTarget ? <Button theme={theme} compact={compact} icon="Paperclip" loading={attaching} title={compact ? "Attach" : `Attach to ${attachTarget.label}`}
+      accessibilityLabel={`Attach ${line ? "this match" : "this conversation"} to ${attachTarget.label}`} accessibilityHint="Adds it to the message box, then returns you there" onPress={() => void attach()} /> : null}
+    {/* Next to Attach the label drops "excerpt" so the four actions fit one row of a 600px pane. */}
+    <Button theme={theme} compact={compact} icon="Copy" title={compact || attachTarget ? "Copy" : "Copy excerpt"} accessibilityLabel="Copy the excerpt" disabled={!data || data.messages.length === 0} onPress={() => void copy()} />
+    {canOpen && !result.row.synthetic ? <Button theme={theme} kind="ghost" compact={compact} icon="FolderOpen" title="Workspace" accessibilityLabel={`Open the workspace ${result.info.workspaceTitle ?? ""}`} onPress={() => onOpenWorkspace(result)} /> : null}
+  </>;
+  const row = { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 } as const;
+  // On a phone four actions don't fit one row: Open takes the first row on its own, full width,
+  // and the three secondary actions share the second, instead of Workspace wrapping alone.
+  const actions = compact && attachTarget
+    ? <View style={{ gap: 8 }}>{open ? <View style={row}>{open}</View> : null}<View style={row}>{secondary}</View></View>
+    : <View style={row}>{open}{secondary}</View>;
 
   return <View style={inSheet ? undefined : { flex: 1, minHeight: 0 }}>
     <View style={{ gap: 8, paddingHorizontal: inSheet ? 0 : 24, paddingTop: inSheet ? 0 : 20, paddingBottom: 14 }}>

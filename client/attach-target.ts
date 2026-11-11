@@ -79,3 +79,15 @@ export function resolveAttachTarget(lookup: ComposerLookup | null, from: string 
   const focused = firstComposer(lookup, FOCUSED);
   return focused ? { selector: FOCUSED, composer: focused, agentId: null, label: "this session" } : null;
 }
+
+/**
+ * A failed attach in words a person can act on, without the transport's request details. A host
+ * whose Transcript Search predates the attach RPC answers "Plugin transcript-search does not
+ * contribute RPC transcript-search.attach-item" (seen in the 0.16 harness).
+ */
+export function attachError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (/does not contribute RPC|unknown (rpc|handler|method)|not registered|no handler|handler_not_found|unknown_rpc/i.test(raw)) return "That host can't attach yet. Update Transcript Search there, or copy the excerpt.";
+  const message = raw.replace(/^Request failed:\s*/i, "").replace(/\s+requestType=\S+.*$/, "").trim();
+  return message ? `Couldn't attach: ${message}` : "Couldn't attach this conversation. Copy the excerpt instead.";
+}

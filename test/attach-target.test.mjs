@@ -69,3 +69,12 @@ test("invariant: the search screen's code calls no host state or composer hooks"
   }
   assert.deepEqual(offenders, []);
 });
+
+test("a failed attach reads as something a person can act on", async () => {
+  const { attachError } = await load();
+  assert.equal(attachError(new Error("Request failed: Plugin transcript-search does not contribute RPC transcript-search.attach-item requestType=plugin.rpc.invoke.request code=handler_error")),
+    "That host can't attach yet. Update Transcript Search there, or copy the excerpt.", "an older Transcript Search on that host");
+  assert.equal(attachError(new Error("Request failed: That session is not on this host any more. requestType=plugin.rpc.invoke.request code=handler_error")),
+    "Couldn't attach: That session is not on this host any more.", "the server's reason, without the transport details");
+  assert.equal(attachError(undefined), "Couldn't attach this conversation. Copy the excerpt instead.");
+});
