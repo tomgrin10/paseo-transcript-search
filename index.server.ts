@@ -5,8 +5,8 @@ import { buildCensus, clearCensusCaches } from "./server/census";
 import { getIndexStatus, stopIndexer } from "./server/indexer";
 import { abortAllSearches, runSearch } from "./server/search";
 import { clearTranscriptCaches } from "./server/transcripts";
-import { attachSearch, hostIdentity, indexStatus, listHistory, readExcerpt, restoreAgent, searchHistory } from "./shared/contracts";
-import { searchAttachments } from "./server/attach";
+import { attachItem, attachSearch, hostIdentity, indexStatus, listHistory, readExcerpt, restoreAgent, searchHistory } from "./shared/contracts";
+import { attachItemFor, searchAttachments } from "./server/attach";
 import { excerptForAgent } from "./server/excerpt";
 import { serverId } from "./server/sessions";
 import { restoreArchivedAgent } from "./server/restore-agent";
@@ -28,6 +28,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(indexStatus, () => getIndexStatus());
   server.handle(readExcerpt, ({ agentId, fileName, ...options }) => excerptForAgent(agentId, fileName, options));
   server.handle(attachSearch, ({ query }) => searchAttachments(query));
+  server.handle(attachItem, (input) => attachItemFor(input));
   return async () => {
     removeTools();
     abortAllSearches();

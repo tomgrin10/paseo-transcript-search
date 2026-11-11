@@ -127,3 +127,15 @@ test("result lines lead with the match and read Codex shell output, not its JSON
   const plain = snippetText({ role: "tool", before: "PASS ", match: "retry", after: ".test.ts" });
   assert.equal(plain.value, "PASS retry.test.ts", "ordinary tool output is left alone");
 });
+
+test("Attach asks the result's host by the raw agent id, never the host-scoped key", async () => {
+  const { attachRequest, isSameSession } = await load("shared/results.ts");
+  const result = { key: JSON.stringify(["srv_a", "past-retries"]) };
+  const line = { file: "main", lineNumber: 4, role: "user", before: "", match: "idempotency", after: "" };
+  const q = { query: "idempotency", regex: false, caseSensitive: true, ranked: false };
+  assert.deepEqual(attachRequest(result, line, q, 3), { agentId: "past-retries", query: "idempotency", regex: false, caseSensitive: true, snippet: line, hitCount: 3 });
+  assert.deepEqual(attachRequest(result, null, q, 0), { agentId: "past-retries" }, "a session previewed by its opening and last turns sends no line");
+  assert.equal(isSameSession(result, "past-retries"), true);
+  assert.equal(isSameSession(result, JSON.stringify(["srv_a", "past-retries"])), false, "from is a raw id; only the raw id compares");
+  assert.equal(isSameSession(result, null), false);
+});

@@ -51,7 +51,9 @@ export function Button({ title, onPress, theme, kind = "secondary", disabled = f
         : kind === "ghost" ? { backgroundColor: pressed ? c.surface2 : hovered ? c.surface1 : "transparent" }
         : { ...raised(c), backgroundColor: pressed ? c.surface2 : hovered ? c.surface2 : c.surface1 }),
     })}>
-    {loading ? <Spinner color={fg} size={12} /> : icon ? <Icon name={icon} size={compact ? 16 : 14} color={fg} /> : null}
+    {/* The spinner sits in the icon's box, so a pending button keeps its width and its neighbours stay put. */}
+    {loading ? <View style={{ width: icon ? (compact ? 16 : 14) : 12, height: icon ? (compact ? 16 : 14) : 12, alignItems: "center", justifyContent: "center" }}><Spinner color={fg} size={12} /></View>
+      : icon ? <Icon name={icon} size={compact ? 16 : 14} color={fg} /> : null}
     <Text numberOfLines={1} style={{ color: fg, fontSize: compact ? 14 : small ? 12 : 13, lineHeight: compact ? 19 : 16, fontWeight: kind === "primary" ? "600" : "500", ...tabular }}>{title}</Text>
     {trailing && !compact ? <Text style={{ color: withAlpha(fg, 0.7), fontSize: 12, lineHeight: 16 }}>{trailing}</Text> : null}
   </PressScale>;
