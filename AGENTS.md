@@ -22,7 +22,9 @@ Paseo 0.14.0 or newer. This is a trusted plugin with independent client and serv
 ## Automated npm releases
 
 - The public install command is `paseo plugin install paseo-transcript-search`. Keep it in the README and keep Other plugins as its final section.
-- Update package.json and package-lock.json together for a release. Tag the exact clean main commit as vX.Y.Z and push the tag.
+- Releases need Tom's manual permission. Features and fixes ship as betas (`X.Y.Z-beta.N`, npm `beta` tag) by default. A stable version, npm `latest`, or a hotfix needs Tom's explicit OK for that exact version before it is tagged; never infer it from a plan.
+- Update package.json and package-lock.json together for a release. Tag the exact clean main commit as vX.Y.Z (or vX.Y.Z-beta.N) and push the tag.
+- **Betas.** `publish-npm.yml` publishes any version containing `-` with `--tag beta` (`scripts/check-dist-tag.mjs`), then verifies after publishing, on the retry path too, that the expected dist-tag points at the version and that a prerelease is never `latest`. Mark the GitHub release as a prerelease (`gh release create vX.Y.Z-beta.N --prerelease --latest=false`). Install with `paseo plugin update transcript-search --version X.Y.Z-beta.N` (the plugin id, not the package name). `test/release-channel.test.mjs` guards the publish command and the post-publish check.
 - .github/workflows/publish-npm.yml validates the tag, runs verification and package inspection, and publishes with npm Trusted Publishing through GitHub OIDC. Do not publish manually.
 - Keep npm publisher permissions scoped to tomgrin10/paseo-transcript-search and publish-npm.yml. No long-lived npm token is needed in GitHub.
 - Wait for the workflow and registry integrity check before creating a GitHub release or updating an installed copy. Test the bare package-name installer in an isolated Paseo home; never restart the user's daemon.
