@@ -4,7 +4,7 @@
   "description": "Search text across active and archived Paseo session transcripts.",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && node --test test/*.test.mjs && node --test --experimental-strip-types agent-tools.test.mjs && node --test native-tools.test.mjs"
+    "verify": "npm run typecheck && node --test test/*.test.mjs && node --test --experimental-strip-types agent-tools.test.mjs && node --test native-tools.test.mjs && node --test scripts/release-notes.test.mjs"
   },
   "devDependencies": {
     "@getpaseo/client": "0.14.0",
