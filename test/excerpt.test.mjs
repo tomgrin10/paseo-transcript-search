@@ -132,3 +132,26 @@ test("the composer's Past conversation source lists recent sessions and matches 
     assert.ok(matched.items[0].text.length <= 12_000);
   } finally { await f.close(); }
 });
+
+test("the preview's Attach builds the + menu's item around the previewed line", async () => {
+  const f = await fixture();
+  try {
+    const search = await f.invoke("agents-history.search", { query: "idempotency", mode: "regex", agentIds: ["claude-1"] });
+    const snippet = search.matches[0].snippets[0];
+    const fromMenu = (await f.invoke("transcript-search.attach-search", { query: "idempotency" })).items[0];
+    const { item } = await f.invoke("transcript-search.attach-item", { agentId: "claude-1", query: "idempotency", snippet, hitCount: 3 });
+    for (const key of ["id", "identifier", "title", "url", "resourceType"]) assert.equal(item[key], fromMenu[key], `${key} matches the + menu's item, so both paths make the same pill`);
+    assert.equal(item.subtitle, fromMenu.subtitle);
+    assert.match(item.text, /^A past Paseo conversation, attached from Transcript Search\./);
+    assert.match(item.text, /One of 3 lines matching "idempotency":/, "one previewed line out of several says so");
+    assert.match(item.text, new RegExp(`Around line ${snippet.lineNumber}:`));
+    assert.match(item.text, /\[match\]/);
+    assert.ok(!JSON.stringify(item).includes("MUST-NOT-RETURN"));
+
+    const digest = await f.invoke("transcript-search.attach-item", { agentId: "codex-1" });
+    assert.equal(digest.item.id, "codex-1");
+    assert.doesNotMatch(digest.item.text, /matching/, "a session previewed without a match attaches its opening and last turns");
+
+    await assert.rejects(f.invoke("transcript-search.attach-item", { agentId: "gone" }), /not on this host/);
+  } finally { await f.close(); }
+});

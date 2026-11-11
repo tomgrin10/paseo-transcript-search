@@ -1,10 +1,12 @@
 import { Icon, ScrollView, copyText, useToast } from "@getpaseo/plugin/client/ui";
-import { useRef, type MutableRefObject, type ReactNode, type RefObject } from "react";
+import { useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Platform, type ScrollView as NativeScrollView, Text, View } from "react-native";
-import type { Excerpt, ExcerptMessage } from "../shared/contracts";
+import { attachItem, type Excerpt, type ExcerptMessage } from "../shared/contracts";
 import type { HighlightQuery } from "../shared/highlight";
 import { formatTimeAgo } from "../shared/model";
-import type { SessionResult } from "../shared/results";
+import { attachRequest, isSameSession, type SessionResult } from "../shared/results";
+import { ATTACH_SOURCE_ID, type AttachTarget, type ComposerLookup, attachError, firstComposer } from "./attach-target";
+import { rpcForHost } from "./federation";
 import { Button, Chip, Kbd, Marked, text, type Theme } from "./kit";
 import { Reveal, Skeleton } from "./motion";
 import { mono, tabular } from "./theme";
@@ -39,10 +41,16 @@ export interface PreviewProps {
   onOpenWorkspace(result: SessionResult): void;
   /** A sheet already shows the title in its header. */
   inSheet?: boolean;
+  /** The composer "Attach to <session>" fills (Paseo 0.16); none hides the action. */
+  attachTo?: AttachTarget | null;
+  /** `client.composers`, to find the live composer again at press time. */
+  lookup?: ComposerLookup | null;
+  /** After a successful attach, before the composer takes focus. */
+  onAttached?(): void;
 }
 
 /** The match in its conversation: the turns before and after, the matched one marked. */
-export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen, onOpen, onOpenWorkspace, inSheet = false }: PreviewProps) {
+export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen, onOpen, onOpenWorkspace, inSheet = false, attachTo = null, lookup = null, onAttached }: PreviewProps) {
   const c = theme.colors;
   const t = text(c);
   const toast = useToast();
@@ -70,14 +78,44 @@ export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen
     catch { toast.error("Couldn't copy here. Select the text instead."); }
   };
 
-  const actions = (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-      {canOpen ? <Button theme={theme} kind="primary" compact={compact} icon={archived ? "ArchiveRestore" : "ArrowUpRight"} title={archived ? "Restore and open" : "Open session"} trailing={compact ? undefined : "↵"}
-        accessibilityLabel={archived ? `Restore and open ${result.info.title} on ${result.host.label}` : `Open ${result.info.title} on ${result.host.label}`} onPress={() => onOpen(result)} /> : null}
-      <Button theme={theme} compact={compact} icon="Copy" title={compact ? "Copy" : "Copy excerpt"} accessibilityLabel="Copy the excerpt" disabled={!data || data.messages.length === 0} onPress={() => void copy()} />
-      {canOpen && !result.row.synthetic ? <Button theme={theme} kind="ghost" compact={compact} icon="FolderOpen" title="Workspace" accessibilityLabel={`Open the workspace ${result.info.workspaceTitle ?? ""}`} onPress={() => onOpenWorkspace(result)} /> : null}
-    </View>
-  );
+  const [attaching, setAttaching] = useState(false);
+  // Attaching a session to itself hands the agent nothing new.
+  const attachTarget = attachTo && !isSameSession(result, attachTo.agentId) ? attachTo : null;
+  const attach = async () => {
+    if (!attachTarget || attaching) return;
+    setAttaching(true);
+    try {
+      const { item } = await rpcForHost(result.host.id)(attachItem, attachRequest(result, line, query, total));
+      const composer = (lookup && firstComposer(lookup, attachTarget.selector)) ?? attachTarget.composer;
+      // One pill per session: attaching it again swaps in the line previewed now.
+      composer.removeAttachment?.({ sourceId: ATTACH_SOURCE_ID, itemId: item.id });
+      composer.addAttachment({ sourceId: ATTACH_SOURCE_ID, item });
+      toast.show(`Attached to ${attachTarget.label}`, { variant: "success" });
+      onAttached?.();
+      await composer.focus().catch(() => undefined);
+    } catch (error) {
+      toast.error(attachError(error));
+    } finally {
+      setAttaching(false);
+    }
+  };
+
+  const open = canOpen ? <Button theme={theme} kind="primary" compact={compact} icon={archived ? "ArchiveRestore" : "ArrowUpRight"} title={archived ? "Restore and open" : "Open session"} trailing={compact ? undefined : "↵"}
+    grow={compact && attachTarget !== null}
+    accessibilityLabel={archived ? `Restore and open ${result.info.title} on ${result.host.label}` : `Open ${result.info.title} on ${result.host.label}`} onPress={() => onOpen(result)} /> : null;
+  const secondary = <>
+    {attachTarget ? <Button theme={theme} compact={compact} icon="Paperclip" loading={attaching} title={compact ? "Attach" : `Attach to ${attachTarget.label}`}
+      accessibilityLabel={`Attach ${line ? "this match" : "this conversation"} to ${attachTarget.label}`} accessibilityHint="Adds it to the message box, then returns you there" onPress={() => void attach()} /> : null}
+    {/* Next to Attach the label drops "excerpt" so the four actions fit one row of a 600px pane. */}
+    <Button theme={theme} compact={compact} icon="Copy" title={compact || attachTarget ? "Copy" : "Copy excerpt"} accessibilityLabel="Copy the excerpt" disabled={!data || data.messages.length === 0} onPress={() => void copy()} />
+    {canOpen && !result.row.synthetic ? <Button theme={theme} kind="ghost" compact={compact} icon="FolderOpen" title="Workspace" accessibilityLabel={`Open the workspace ${result.info.workspaceTitle ?? ""}`} onPress={() => onOpenWorkspace(result)} /> : null}
+  </>;
+  const row = { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 } as const;
+  // On a phone four actions don't fit one row: Open takes the first row on its own, full width,
+  // and the three secondary actions share the second, instead of Workspace wrapping alone.
+  const actions = compact && attachTarget
+    ? <View style={{ gap: 8 }}>{open ? <View style={row}>{open}</View> : null}<View style={row}>{secondary}</View></View>
+    : <View style={row}>{open}{secondary}</View>;
 
   return <View style={inSheet ? undefined : { flex: 1, minHeight: 0 }}>
     <View style={{ gap: 8, paddingHorizontal: inSheet ? 0 : 24, paddingTop: inSheet ? 0 : 20, paddingBottom: 14 }}>
