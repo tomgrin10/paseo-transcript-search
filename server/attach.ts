@@ -1,6 +1,7 @@
 import type { PluginAttachmentItem } from "@getpaseo/plugin";
 import { type AgentMatch, MAX_SEARCH_AGENTS, type Snippet } from "../shared/contracts";
 import { shortDate } from "../shared/model";
+import type { SessionInfo } from "../shared/session-info";
 import { buildCensus } from "./census";
 import { excerptForAgent } from "./excerpt";
 import { runSearch } from "./search";
@@ -65,31 +66,63 @@ export async function searchAttachments(rawQuery: string, signal?: AbortSignal):
   const items: PluginAttachmentItem[] = [];
   for (const { agentId, match } of chosen) {
     const session = sessions.get(agentId);
-    if (!session) continue;
-    const { info } = session;
-    const first = match?.snippets[0];
-    const when = shortDate(info.lastActivityAt, Date.now());
-    const subtitle = [first ? `“${matchWindow(first, info.title.length)}”` : null, info.workspaceTitle ?? info.projectName, info.providerLabel, when].filter(Boolean).join(" · ");
-    items.push({
-      id: agentId,
-      // The picker row reads `${identifier} ${title}`: a date there runs into the title.
-      identifier: "",
-      title: info.title,
-      subtitle: trimTo(subtitle, 180),
-      url: `https://app.paseo.sh/h/${encodeURIComponent(host)}/agent/${encodeURIComponent(agentId)}`,
-      text: await attachmentText(agentId, host, sessionHeading(info, agentId, host), query, match, signal),
-      resourceType: "conversation",
-    });
+    if (session) items.push(await itemFor(agentId, session.info, host, { query, regex: false, caseSensitive: false }, match, signal));
   }
   return { items };
 }
 
+/** How the session was searched; the excerpt centres a long message on it. */
+interface SearchUsed {
+  query: string;
+  regex: boolean;
+  caseSensitive: boolean;
+}
+
+/** One session as the "+" menu attaches it: a picker row, and the text the agent receives. */
+async function itemFor(agentId: string, info: SessionInfo, host: string, search: SearchUsed, match: AgentMatch | null, signal?: AbortSignal): Promise<PluginAttachmentItem> {
+  const first = match?.snippets[0];
+  const when = shortDate(info.lastActivityAt, Date.now());
+  const subtitle = [first ? `“${matchWindow(first, info.title.length)}”` : null, info.workspaceTitle ?? info.projectName, info.providerLabel, when].filter(Boolean).join(" · ");
+  return {
+    id: agentId,
+    // The picker row reads `${identifier} ${title}`: a date there runs into the title.
+    identifier: "",
+    title: info.title,
+    subtitle: trimTo(subtitle, 180),
+    url: `https://app.paseo.sh/h/${encodeURIComponent(host)}/agent/${encodeURIComponent(agentId)}`,
+    text: await attachmentText(agentId, host, sessionHeading(info, agentId, host), search, match, signal),
+    resourceType: "conversation",
+  };
+}
+
+export interface AttachItemInput extends SearchUsed {
+  agentId: string;
+  snippet?: Snippet;
+  hitCount?: number;
+}
+
+/**
+ * The search screen's "Attach to <session>": the item the "+" menu would attach for this session,
+ * built around the previewed line, so both paths hand the agent the same thing.
+ */
+export async function attachItemFor(input: AttachItemInput, signal?: AbortSignal): Promise<{ item: PluginAttachmentItem }> {
+  const census = await buildCensus();
+  const session = sessionIndex(census).get(input.agentId);
+  if (!session) throw new Error("That session is not on this host any more.");
+  const match: AgentMatch | null = input.snippet
+    ? { agentId: input.agentId, snippets: [input.snippet], truncated: false, hitCount: Math.max(1, input.hitCount ?? 1) }
+    : null;
+  const search = { query: input.query.trim(), regex: input.regex, caseSensitive: input.caseSensitive };
+  return { item: await itemFor(input.agentId, session.info, await serverId(), search, match, signal) };
+}
+
 /** What the agent receives: who and where, then the matched lines in their turns, or the last turns. */
-async function attachmentText(agentId: string, host: string, heading: string, query: string, match: AgentMatch | null, signal?: AbortSignal): Promise<string> {
+async function attachmentText(agentId: string, host: string, heading: string, search: SearchUsed, match: AgentMatch | null, signal?: AbortSignal): Promise<string> {
   const parts = ["A past Paseo conversation, attached from Transcript Search.", heading];
-  const searchOptions = { query, regex: false, caseSensitive: false, signal };
+  const searchOptions = { ...search, signal };
   if (match && match.snippets.length > 0) {
-    parts.push(`Lines matching "${query}" (${match.hitCount} in total):`);
+    const shown = match.snippets.length === 1 && match.hitCount > 1 ? `One of ${match.hitCount} lines matching` : "Lines matching";
+    parts.push(search.query ? `${shown} "${search.query}"${shown === "Lines matching" ? ` (${match.hitCount} in total)` : ""}:` : "The line the attachment points at:");
     const printed = new Set<string>();
     for (const snippet of match.snippets.slice(0, 2)) {
       const excerpt = await excerptForAgent(agentId, snippet.fileName, { ...searchOptions, lineNumber: snippet.lineNumber, radius: 2 });

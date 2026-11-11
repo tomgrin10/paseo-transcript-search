@@ -24,9 +24,13 @@ export default function contribute(client: PluginClientContext) {
       description: "Search what was said in past sessions",
       argumentHint: "webhook retries",
       context: "agent",
-      onSubmit({ args, openScreen }) {
+      onSubmit({ args, openScreen, agent }) {
         const query = args.trim();
-        openScreen(query ? { screenId: SEARCH_SCREEN, params: { q: query } } : { screenId: SEARCH_SCREEN });
+        // `from` lets the preview attach a match back to this session (Paseo 0.16).
+        const params: Record<string, string> = {};
+        if (query) params.q = query;
+        if (agent?.id) params.from = agent.id;
+        openScreen({ screenId: SEARCH_SCREEN, params });
       },
     }),
     // The composer's + menu: Paseo draws the picker and the pill; this host answers the search.

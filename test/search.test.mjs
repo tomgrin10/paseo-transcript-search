@@ -163,6 +163,8 @@ test("sidebar routes exist at installation mount and an old read cannot undo a s
     assert.deepEqual(opened, { screenId: "search" }, "the Command Center action remains usable while hidden");
     slash[0].onSubmit({ args: "  webhook retries ", openScreen(input) { opened = input; } });
     assert.deepEqual(opened, { screenId: "search", params: { q: "webhook retries" } }, "/recall opens the screen with the query");
+    slash[0].onSubmit({ args: "retries", agent: { id: "agent-7" }, openScreen(input) { opened = input; } });
+    assert.deepEqual(opened, { screenId: "search", params: { q: "retries", from: "agent-7" } }, "/recall names the session it was typed in, so a match can be attached back to it");
     assert.equal(sources[0].search.name, "transcript-search.attach-search");
   } finally { cleanup(); }
 });

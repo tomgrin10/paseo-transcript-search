@@ -1,4 +1,4 @@
-import { PluginAttachmentSearchPayloadSchema, defineRpc } from "@getpaseo/plugin";
+import { PluginAttachmentItemSchema, PluginAttachmentSearchPayloadSchema, defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
 /** Binds each client installation to its stable daemon identity without sharing credentials. */
@@ -267,4 +267,24 @@ export const attachSearch = defineRpc({
   name: "transcript-search.attach-search",
   input: z.object({ query: z.string().max(500) }),
   output: PluginAttachmentSearchPayloadSchema,
+});
+
+/**
+ * The search screen's "Attach to <session>": the same item the "+" menu's picker would attach for
+ * this session, built around the one line the preview shows (or the session's opening and last
+ * turns without one). Asked of the host that holds the transcript.
+ */
+export const attachItem = defineRpc({
+  name: "transcript-search.attach-item",
+  input: z.object({
+    agentId: z.string().min(1),
+    query: z.string().max(500).default(""),
+    regex: z.boolean().default(false),
+    caseSensitive: z.boolean().default(false),
+    /** The previewed match; omitted for a session previewed by its opening and last turns. */
+    snippet: SnippetSchema.optional(),
+    /** Matching lines in the session, for the "N in total" line. */
+    hitCount: z.number().int().nonnegative().optional(),
+  }),
+  output: z.object({ item: PluginAttachmentItemSchema }),
 });
