@@ -3,12 +3,15 @@ import { attachSearch } from "./shared/contracts";
 import { contributeChat } from "./client/chat";
 import { contributeDisplay } from "./client/display";
 import { registerHost } from "./client/federation";
+import { composerLookup } from "./client/attach-target";
 import { SEARCH_SCREEN, SearchScreen } from "./client/search-screen";
 
 export default function contribute(client: PluginClientContext) {
   const releaseHost = registerHost(client);
   const openSettings = () => client.openSettings("display");
-  const Screen = (props: PluginScreenProps) => <SearchScreen {...props} openSettings={openSettings} />;
+  // Paseo 0.16: the preview can attach a match to a session's composer; null on older hosts.
+  const composers = composerLookup(client);
+  const Screen = (props: PluginScreenProps) => <SearchScreen {...props} openSettings={openSettings} composers={composers} />;
   const removers = [
     client.addScreen({ id: SEARCH_SCREEN, title: "Transcript Search", Component: Screen }),
     client.addCommandCenterItem({
@@ -30,6 +33,7 @@ export default function contribute(client: PluginClientContext) {
         const params: Record<string, string> = {};
         if (query) params.q = query;
         if (agent?.id) params.from = agent.id;
+        if (agent?.title) params.fromTitle = agent.title;
         openScreen({ screenId: SEARCH_SCREEN, params });
       },
     }),

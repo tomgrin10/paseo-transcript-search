@@ -1,4 +1,6 @@
-import type { AgentMatch, AgentSummary } from "./contracts";
+import type { AgentMatch, AgentSummary, Snippet } from "./contracts";
+import type { HighlightQuery } from "./highlight";
+import { sourceKey } from "./host-model";
 import { type DayGroup, type HistoryFilters, type HistoryWorkspace, buildQueryMatcher, dayGroup, parseTime, passesStaticFilters, visibleAgents } from "./model";
 import { type SessionInfo, describeSession } from "./session-info";
 
@@ -127,4 +129,22 @@ export function noResultSuggestions(filters: HistoryFilters, hostIds?: ReadonlyS
   if (filters.caseSensitive && !(filters.ranked && !filters.regex)) out.push("ignore-case");
   if (filters.regex) out.push("literal");
   return out;
+}
+
+/**
+ * What the preview's "Attach to <session>" asks the result's host for. RPCs take the raw agent id:
+ * `key` and `agent.id` are host-scoped (`["host","id"]`) on the client, and a scoped id finds no
+ * session on the server ("That session is not on this host any more", found in the 0.16 harness).
+ */
+export function attachRequest(result: Pick<SessionResult, "key">, line: Snippet | null, query: HighlightQuery | null, hitCount: number) {
+  return {
+    agentId: sourceKey(result.key).id,
+    ...(line && query && query.query.trim() ? { query: query.query, regex: query.regex, caseSensitive: query.caseSensitive } : {}),
+    ...(line ? { snippet: line, hitCount } : {}),
+  };
+}
+
+/** Attaching a session to its own composer hands the agent nothing new. */
+export function isSameSession(result: Pick<SessionResult, "key">, agentId: string | null): boolean {
+  return agentId !== null && sourceKey(result.key).id === agentId;
 }

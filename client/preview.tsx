@@ -4,8 +4,8 @@ import { Platform, type ScrollView as NativeScrollView, Text, View } from "react
 import { attachItem, type Excerpt, type ExcerptMessage } from "../shared/contracts";
 import type { HighlightQuery } from "../shared/highlight";
 import { formatTimeAgo } from "../shared/model";
-import type { SessionResult } from "../shared/results";
-import { ATTACH_SOURCE_ID, type AttachTarget } from "./attach-target";
+import { attachRequest, isSameSession, type SessionResult } from "../shared/results";
+import { ATTACH_SOURCE_ID, type AttachTarget, type ComposerLookup, firstComposer } from "./attach-target";
 import { rpcForHost } from "./federation";
 import { Button, Chip, Kbd, Marked, text, type Theme } from "./kit";
 import { Reveal, Skeleton } from "./motion";
@@ -28,10 +28,11 @@ export function excerptText(result: SessionResult, excerpt: Excerpt | undefined)
   return body ? `${head}\n\n${body}` : head;
 }
 
-/** A failed attach in words a person can act on. */
+/** A failed attach in words a person can act on, without the transport's request details. */
 export function attachError(error: unknown): string {
-  const message = error instanceof Error ? error.message : "";
-  if (/unknown (rpc|handler|method)|not (found|registered)|no handler/i.test(message)) return "That host can't attach yet. Update Transcript Search there, or copy the excerpt.";
+  const raw = error instanceof Error ? error.message : "";
+  if (/unknown (rpc|handler|method)|not registered|no handler|handler_not_found|unknown_rpc/i.test(raw)) return "That host can't attach yet. Update Transcript Search there, or copy the excerpt.";
+  const message = raw.replace(/^Request failed:\s*/i, "").replace(/\s+requestType=\S+.*$/, "").trim();
   return message ? `Couldn't attach: ${message}` : "Couldn't attach this conversation. Copy the excerpt instead.";
 }
 
@@ -50,12 +51,14 @@ export interface PreviewProps {
   inSheet?: boolean;
   /** The composer "Attach to <session>" fills (Paseo 0.16); none hides the action. */
   attachTo?: AttachTarget | null;
+  /** `client.composers`, to find the live composer again at press time. */
+  lookup?: ComposerLookup | null;
   /** After a successful attach, before the composer takes focus. */
   onAttached?(): void;
 }
 
 /** The match in its conversation: the turns before and after, the matched one marked. */
-export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen, onOpen, onOpenWorkspace, inSheet = false, attachTo = null, onAttached }: PreviewProps) {
+export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen, onOpen, onOpenWorkspace, inSheet = false, attachTo = null, lookup = null, onAttached }: PreviewProps) {
   const c = theme.colors;
   const t = text(c);
   const toast = useToast();
@@ -85,22 +88,19 @@ export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen
 
   const [attaching, setAttaching] = useState(false);
   // Attaching a session to itself hands the agent nothing new.
-  const attachTarget = attachTo && attachTo.agentId !== result.agent.id ? attachTo : null;
+  const attachTarget = attachTo && !isSameSession(result, attachTo.agentId) ? attachTo : null;
   const attach = async () => {
     if (!attachTarget || attaching) return;
     setAttaching(true);
     try {
-      const { item } = await rpcForHost(result.host.id)(attachItem, {
-        agentId: result.agent.id,
-        ...(line && query ? { query: query.query, regex: query.regex, caseSensitive: query.caseSensitive } : {}),
-        ...(line ? { snippet: line, hitCount: total } : {}),
-      });
+      const { item } = await rpcForHost(result.host.id)(attachItem, attachRequest(result, line, query, total));
+      const composer = (lookup && firstComposer(lookup, attachTarget.selector)) ?? attachTarget.composer;
       // One pill per session: attaching it again swaps in the line previewed now.
-      attachTarget.composer.removeAttachment?.({ sourceId: ATTACH_SOURCE_ID, itemId: item.id });
-      attachTarget.composer.addAttachment({ sourceId: ATTACH_SOURCE_ID, item });
+      composer.removeAttachment?.({ sourceId: ATTACH_SOURCE_ID, itemId: item.id });
+      composer.addAttachment({ sourceId: ATTACH_SOURCE_ID, item });
       toast.show(`Attached to ${attachTarget.label}`, { variant: "success" });
       onAttached?.();
-      await attachTarget.composer.focus().catch(() => undefined);
+      await composer.focus().catch(() => undefined);
     } catch (error) {
       toast.error(attachError(error));
     } finally {
@@ -114,7 +114,7 @@ export function Preview({ result, snippet, query, theme, compact, nowMs, canOpen
         accessibilityLabel={archived ? `Restore and open ${result.info.title} on ${result.host.label}` : `Open ${result.info.title} on ${result.host.label}`} onPress={() => onOpen(result)} /> : null}
       {attachTarget ? <Button theme={theme} compact={compact} icon="Paperclip" loading={attaching} title={compact ? "Attach" : `Attach to ${attachTarget.label}`}
         accessibilityLabel={`Attach ${line ? "this match" : "this conversation"} to ${attachTarget.label}`} accessibilityHint="Adds it to the message box, then returns you there" onPress={() => void attach()} /> : null}
-      <Button theme={theme} compact={compact} icon="Copy" title={compact ? "Copy" : "Copy excerpt"} accessibilityLabel="Copy the excerpt" disabled={!data || data.messages.length === 0} onPress={() => void copy()} />
+      <Button theme={theme} compact={compact} icon="Copy" title={compact || attachTarget ? "Copy" : "Copy excerpt"} accessibilityLabel="Copy the excerpt" disabled={!data || data.messages.length === 0} onPress={() => void copy()} />
       {canOpen && !result.row.synthetic ? <Button theme={theme} kind="ghost" compact={compact} icon="FolderOpen" title="Workspace" accessibilityLabel={`Open the workspace ${result.info.workspaceTitle ?? ""}`} onPress={() => onOpenWorkspace(result)} /> : null}
     </View>
   );

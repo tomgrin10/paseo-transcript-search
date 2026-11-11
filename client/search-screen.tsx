@@ -6,7 +6,7 @@ import { pluralize } from "../shared/model";
 import { type Cursor, type SessionResult, activeFilterCount, moveCursor, noResultSuggestions } from "../shared/results";
 import { Button, GroupLabel, IconButton, text, useNow } from "./kit";
 import { useScreenKeys } from "./keyboard";
-import { useAttachTarget } from "./attach-target";
+import { type ComposerLookup, resolveAttachTarget } from "./attach-target";
 import { useOpenSession } from "./open-session";
 import { Preview } from "./preview";
 import { recentSearches, useRecentSearches } from "./recent";
@@ -24,7 +24,7 @@ const ONE_ROW_FILTERS = 1040;
 export const SEARCH_SCREEN = "search";
 const ROOT_ID = "transcript-search-screen";
 
-export function SearchScreen({ theme, layout, navigation, params, openSettings }: PluginScreenProps & { openSettings(): void }) {
+export function SearchScreen({ theme, layout, navigation, params, openSettings, composers = null }: PluginScreenProps & { openSettings(): void; composers?: ComposerLookup | null }) {
   const c = theme.colors;
   const t = text(c);
   const compact = layout.compact;
@@ -33,7 +33,7 @@ export function SearchScreen({ theme, layout, navigation, params, openSettings }
   const recent = useRecentSearches();
   const opener = useOpenSession(navigation, theme, compact);
   // `/recall` names the session it was typed in; the preview can attach a match straight to it.
-  const attachTo = useAttachTarget(params?.from);
+  const attachTo = resolveAttachTarget(composers, params?.from, params?.fromTitle);
   const input = useRef<TextInput>(null);
   const list = useRef<FlatList<Item>>(null);
   const [width, setWidth] = useState(0);
@@ -182,13 +182,13 @@ export function SearchScreen({ theme, layout, navigation, params, openSettings }
       <View style={{ width: 1, backgroundColor: c.border }} />
       <View style={{ flex: 56, minWidth: 0 }}>
         {s.selected
-          ? <Preview result={s.selected} snippet={s.cursor?.snippet ?? null} query={s.highlight} theme={theme} compact={false} nowMs={nowMs} canOpen={opener.canOpen} onOpen={open} onOpenWorkspace={opener.openWorkspace} attachTo={attachTo} />
+          ? <Preview result={s.selected} snippet={s.cursor?.snippet ?? null} query={s.highlight} theme={theme} compact={false} nowMs={nowMs} canOpen={opener.canOpen} onOpen={open} onOpenWorkspace={opener.openWorkspace} attachTo={attachTo} lookup={composers} />
           : s.history.isPending ? null : <Empty theme={theme} icon="PanelRight" title={s.searchable ? "Pick a line to read it in context" : "Pick a session to see how it went"} detail="↑ and ↓ move through the list; Enter opens the session." />}
       </View>
     </View> : resultsList}
     {!wide && sheetResult ? <Modal title={sheetResult.info.title} open onOpenChange={(next) => { if (!next) setSheet(null); }}>
       <Modal.Content contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24, gap: 0 }}>
-        <Preview inSheet result={sheetResult} snippet={sheet?.snippet ?? null} query={s.highlight} theme={theme} compact={compact} nowMs={nowMs} canOpen={opener.canOpen} onOpen={open} onOpenWorkspace={(result) => { setSheet(null); opener.openWorkspace(result); }} attachTo={attachTo} onAttached={() => setSheet(null)} />
+        <Preview inSheet result={sheetResult} snippet={sheet?.snippet ?? null} query={s.highlight} theme={theme} compact={compact} nowMs={nowMs} canOpen={opener.canOpen} onOpen={open} onOpenWorkspace={(result) => { setSheet(null); opener.openWorkspace(result); }} attachTo={attachTo} lookup={composers} onAttached={() => setSheet(null)} />
       </Modal.Content>
     </Modal> : null}
     {opener.dialog}

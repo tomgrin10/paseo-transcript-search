@@ -1,14 +1,17 @@
-import * as clientApi from "@getpaseo/plugin/client";
 import type { PluginAttachmentItem } from "@getpaseo/plugin";
-import { useMemo } from "react";
 
 /**
  * The composer the search preview's "Attach to <session>" action fills, on Paseo 0.16.
  *
  * A `PluginComposer` is not told which agent it belongs to, so the target is chosen by selector and
  * never by reading an id back: the session `/recall` was typed in (the screen's `from` param), else
- * the focused session. Neither resolving, or a host without `useComposers` (0.15 and older), leaves
- * no target, and the action is not drawn.
+ * the focused session. Neither resolving, or a host without `client.composers` (0.15 and older),
+ * leaves no target, and the action is not drawn.
+ *
+ * This goes through `client.composers(selector)`, a plain call, and not the host's React hooks:
+ * on Paseo 0.16 a plugin screen has no provider for `useComposers` / `useAgent`, and they throw
+ * ("Plugin state hooks must run inside a plugin host"), which took the whole screen down. A plain
+ * call can be guarded; a throwing hook cannot.
  */
 
 /** The `addAttachmentSource` id the composer "+" menu registers; the pill is the same either way. */
@@ -21,45 +24,58 @@ export interface AttachComposer {
   focus(): Promise<void>;
 }
 
-type Selector = { agentId: string } | { focused: true };
-
-/** 0.16-only export, read off the module so the 0.14 typings still compile. */
-const useComposersOnHost = (clientApi as unknown as { useComposers?: (selector: Selector) => readonly AttachComposer[] }).useComposers;
-const useAgentOnHost = (clientApi as unknown as { useAgent?: <T>(agentId: string, select: (agent: { title: string | null }) => T) => T | null }).useAgent;
+export type ComposerSelector = { agentId: string } | { focused: true };
+/** `client.composers`, when this host has it. */
+export type ComposerLookup = (selector: ComposerSelector) => readonly AttachComposer[];
 
 export interface AttachTarget {
+  /** Resolves the composer again at press time, so the live one gets the item. */
+  selector: ComposerSelector;
   composer: AttachComposer;
-  /** The session the button names; null for the focused session, whose agent is not known. */
+  /** The session the button names; null for the focused session. */
   agentId: string | null;
   label: string;
 }
 
-const NO_COMPOSERS: readonly AttachComposer[] = [];
-const FOCUSED: Selector = { focused: true };
-const NONE = () => NO_COMPOSERS;
-const NO_TITLE = () => null;
-
-/** A session title short enough for a button. */
-export function shortTitle(title: string, limit = 28): string {
-  const flat = title.replace(/\s+/g, " ").trim();
-  return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}…`;
+/** `client.composers` bound to its client, or null on a host before Paseo 0.16. */
+export function composerLookup(client: unknown): ComposerLookup | null {
+  const composers = (client as { composers?: unknown } | null)?.composers;
+  if (typeof composers !== "function") return null;
+  return (selector) => composers.call(client, selector) as readonly AttachComposer[];
 }
 
-/** Whether this host can attach to a composer at all (Paseo 0.16+). */
-export const canAttachToComposer = typeof useComposersOnHost === "function";
-
-export function useAttachTarget(fromAgentId: string | undefined): AttachTarget | null {
-  // The hooks are fixed per host build, so the calls stay in the same order on every render.
-  const useComposers = useComposersOnHost ?? NONE;
-  const useAgent = useAgentOnHost ?? NO_TITLE;
-  const from = fromAgentId?.trim() || "";
-  const fromSelector = useMemo<Selector>(() => (from ? { agentId: from } : FOCUSED), [from]);
-  const fromComposer = useComposers(fromSelector)[0];
-  const focusedComposer = useComposers(FOCUSED)[0];
-  const title = useAgent(from || "\u0000", (agent) => agent.title);
-  return useMemo(() => {
-    if (from && fromComposer) return { composer: fromComposer, agentId: from, label: title?.trim() ? shortTitle(title) : "your session" };
-    if (focusedComposer) return { composer: focusedComposer, agentId: null, label: "this session" };
+/** The first composer `selector` names; a host error counts as none, never as a crash. */
+export function firstComposer(lookup: ComposerLookup, selector: ComposerSelector): AttachComposer | null {
+  try {
+    const found = lookup(selector);
+    return Array.isArray(found) && found.length > 0 ? found[0]! : null;
+  } catch {
     return null;
-  }, [focusedComposer, from, fromComposer, title]);
+  }
+}
+
+/**
+ * A session title short enough for a button that shares a row with Open, Copy and Workspace in a
+ * 600px preview pane: cut at a word boundary when one is near, so it reads "Refund flow…".
+ */
+export function shortTitle(title: string, limit = 24): string {
+  const flat = title.replace(/\s+/g, " ").trim();
+  if (flat.length <= limit) return flat;
+  const cut = flat.slice(0, limit - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space >= limit / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+const FOCUSED: ComposerSelector = { focused: true };
+
+export function resolveAttachTarget(lookup: ComposerLookup | null, from: string | undefined, fromTitle: string | undefined): AttachTarget | null {
+  if (!lookup) return null;
+  const agentId = from?.trim() ?? "";
+  if (agentId) {
+    const selector = { agentId };
+    const composer = firstComposer(lookup, selector);
+    if (composer) return { selector, composer, agentId, label: fromTitle?.trim() ? shortTitle(fromTitle) : "your session" };
+  }
+  const focused = firstComposer(lookup, FOCUSED);
+  return focused ? { selector: FOCUSED, composer: focused, agentId: null, label: "this session" } : null;
 }
