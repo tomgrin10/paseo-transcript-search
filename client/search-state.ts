@@ -58,6 +58,8 @@ export function useSearchState(initialQuery: string | undefined, nowMs: number) 
   const unsearchable = scopeSessions - agentIds.length;
 
   const mode = searchMode(filters);
+  /** The user's sort choice: best-match ordering versus activity order. Matching always runs through the index. */
+  const sortRanked = filters.ranked && !filters.regex;
   const searchHosts = useMemo(() => history.successfulHosts.filter((host) => hostScope(host.serverId)), [history.successfulHosts, hostScope]);
   const search = useHistorySearch(searchHosts, { query: filters.query, mode, regex: filters.regex, caseSensitive: filters.caseSensitive, agentIds });
   const indexNote = useIndexStatus(searchHosts, searchable && mode === "ranked");
@@ -73,9 +75,9 @@ export function useSearchState(initialQuery: string | undefined, nowMs: number) 
   const shown: Shown | null = answered ? last.current : stale ? last.current : null;
   const shownFilters = shown ? { ...effective, query: shown.query } : effective;
 
-  const results = useMemo(() => buildResults(rows, shownFilters, { nowMs, matches: shown?.matches ?? (searchable ? new Map() : null), ranked: shown?.ranked ?? false, hostIds })
-    .filter((result) => result.match !== null || !search.failedAgentIds.has(result.key) || !searchable), [rows, shownFilters.query, filters, nowMs, shown, hostIds, searchable, search.failedAgentIds]);
-  const groups = useMemo(() => groupResults(results, nowMs, shown?.ranked ?? false), [results, nowMs, shown?.ranked]);
+  const results = useMemo(() => buildResults(rows, shownFilters, { nowMs, matches: shown?.matches ?? (searchable ? new Map() : null), ranked: sortRanked, hostIds })
+    .filter((result) => result.match !== null || !search.failedAgentIds.has(result.key) || !searchable), [rows, shownFilters.query, filters, nowMs, shown, hostIds, searchable, search.failedAgentIds, sortRanked]);
+  const groups = useMemo(() => groupResults(results, nowMs, sortRanked), [results, nowMs, sortRanked]);
   const cursors = useMemo(() => cursorsOf(groups, SNIPPETS_SHOWN), [groups]);
   const current = reconcileCursor(cursors, cursor);
   const selected = current ? results.find((result) => result.key === current.key) ?? null : null;
