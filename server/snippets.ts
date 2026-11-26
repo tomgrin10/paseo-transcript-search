@@ -165,6 +165,15 @@ function classifyCodex(record: Record<string, unknown>): Extracted | null {
   return { role: "other", text: "", timestamp };
 }
 
+function classifyOpencode(record: Record<string, unknown>): Extracted | null {
+  if (asString(record["provider"]) !== "opencode") return { role: "other", text: "", timestamp: undefined };
+  const role = asString(record["role"]);
+  const text = asString(record["text"]) ?? "";
+  const timestamp = asString(record["timestamp"]) ?? undefined;
+  if (role === "user" || role === "assistant" || role === "tool") return { role, text, timestamp };
+  return { role: "other", text, timestamp };
+}
+
 /** Best-effort extraction for providers whose record shape is not known. */
 function classifyGeneric(record: Record<string, unknown>): Extracted {
   const timestamp = asString(record["timestamp"]) ?? undefined;
@@ -203,6 +212,8 @@ export function classifyLine(raw: string, provider: string): Extracted | null {
       return classifyClaude(parsed);
     case "codex":
       return classifyCodex(parsed);
+    case "opencode":
+      return classifyOpencode(parsed);
     default:
       return classifyGeneric(parsed);
   }

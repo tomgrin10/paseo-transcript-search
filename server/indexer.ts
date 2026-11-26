@@ -437,6 +437,8 @@ function mightHoldMessage(line: string, provider: string): boolean {
     case "codex":
       // Codex also mirrors each message into event_msg records; response_item is the canonical one.
       return line.includes('"response_item"');
+    case "opencode":
+      return line.includes('"provider":"opencode"');
     default:
       return true;
   }

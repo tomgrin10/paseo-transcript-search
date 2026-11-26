@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import type { TranscriptReason } from "../shared/contracts";
 import type { AgentRecord } from "./census";
+import { resolveOpencodeTranscript, clearOpencodeCaches } from "./opencode";
 
 /**
  * Finds the conversation files a provider keeps on disk for an agent. Paseo does not persist
@@ -17,6 +18,9 @@ import type { AgentRecord } from "./census";
  * - Codex: `<codex home>/sessions/YYYY/MM/DD/rollout-<time>-<threadId>.jsonl`, moved to
  *   `archived_sessions/` when Paseo archives the agent. Found through a cached index keyed by
  *   thread id.
+ * - OpenCode: sessions live in a shared SQLite database under the OpenCode data directory;
+ *   each session is exported to a JSONL cache under the plugin's data directory (see
+ *   `opencode.ts`) so the same file pipeline applies.
  * - OMP, Pi, and anything else whose native handle is an absolute path to an existing file.
  * - ACP providers (Cursor, Kilo, Copilot, ...) keep no transcript on disk.
  */
@@ -59,6 +63,7 @@ export function clearTranscriptCaches(): void {
   resolutions.clear();
   claudeIndex = null;
   rolloutIndex = null;
+  clearOpencodeCaches();
 }
 
 export function claudeRoot(): string {
@@ -241,6 +246,21 @@ async function resolveCodex(record: AgentRecord): Promise<TranscriptResolution> 
   return files.length > 0 ? { files } : { files: [], reason: "file-missing" };
 }
 
+// --- OpenCode --------------------------------------------------------------------------------
+
+/**
+ * OpenCode keeps its sessions in a shared SQLite database, so the transcript
+ * for one session is exported to a JSONL cache file first. The cache lives in
+ * the plugin's own data directory; OpenCode's is only read.
+ */
+async function resolveOpencode(record: AgentRecord): Promise<TranscriptResolution> {
+  const sessionId = record.persistence?.sessionId ?? record.persistence?.nativeHandle ?? null;
+  if (!sessionId) return { files: [], reason: "no-session" };
+  const path = await resolveOpencodeTranscript(sessionId);
+  if (!path) return { files: [], reason: "file-missing" };
+  return { files: [{ path, kind: "main" }] };
+}
+
 // --- Everything else -------------------------------------------------------------------------
 
 const FILE_HANDLE_PROVIDERS = new Set(["omp", "pi"]);
@@ -263,6 +283,8 @@ async function resolveUncached(record: AgentRecord): Promise<TranscriptResolutio
       return resolveClaude(record);
     case "codex":
       return resolveCodex(record);
+    case "opencode":
+      return resolveOpencode(record);
     default:
       return resolveByHandle(record);
   }
